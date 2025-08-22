@@ -3,7 +3,7 @@
     "default": "my-snack-e52ae"
   },
   "targets": {
-    "mysnack-97e3e": {
+    "my-snack-e52ae": {
       "hosting": {
         "mysnack-backoffice-6fb29": [
           "mysnack-backoffice-6fb29"
