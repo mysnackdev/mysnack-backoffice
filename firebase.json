@@ -1,0 +1,18 @@
+
+{
+  "hosting": {
+    "site": "mysnack-backoffice-6fb29",
+    "public": "out",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
