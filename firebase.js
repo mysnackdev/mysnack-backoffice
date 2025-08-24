@@ -3,14 +3,14 @@ import { getDatabase } from "firebase/database";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCkymKOrvjC8cobaJM5ghL32-rhBBg-Gas",
-  authDomain: "my-snack-cd3cb.firebaseapp.com",
-  databaseURL: "https://my-snack-cd3cb-default-rtdb.firebaseio.com",
-  projectId: "my-snack-cd3cb",
-  storageBucket: "my-snack-cd3cb.appspot.com",
-  messagingSenderId: "709071649276",
-  appId: "1:709071649276:web:2c69414361ed27790c5a79",
-  measurementId: "G-9W2VQ59HFL",
+  apiKey: "AIzaSyB0b4Xr_GhY7szpqdcTbNnei2awQM4J2FA",
+  authDomain: "my-snack-e52ae.firebaseapp.com",
+  databaseURL: "https://my-snack-e52ae-default-rtdb.firebaseio.com",
+  projectId: "my-snack-e52ae",
+  storageBucket: "my-snack-e52ae.firebasestorage.app",
+  messagingSenderId: "413629389861",
+  appId: "1:413629389861:web:934d80fb847698f514f3cc",
+  measurementId: "G-PRWKXHJJVM"
 };
 
 const app = initializeApp(firebaseConfig);
