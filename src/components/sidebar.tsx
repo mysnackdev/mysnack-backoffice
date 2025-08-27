@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import {usePathname, useRouter} from "next/navigation";
-import {signOut} from "firebase/auth";
-import {auth} from "../../firebase";
+import { usePathname, useRouter } from "next/navigation";
+import { signOut } from "firebase/auth";
+import { auth } from "../../firebase";
 
-function itemClass(active: boolean){
+function itemClass(active: boolean) {
   return "block px-4 py-2 rounded-xl " + (active ? "bg-zinc-900 text-white" : "hover:bg-zinc-100");
 }
 
@@ -14,9 +14,18 @@ export default function Sidebar() {
   const router = useRouter();
 
   async function handleSignOut() {
-    await signOut(auth);
-    router.replace("/login");
+    try {
+      await signOut(auth);
+      router.replace("/login");
+    } catch {
+      // opcional: exibir toast/erro
+    }
   }
+
+  const path = pathname ?? "";
+  const isHome = path === "/";
+  const isProducts = path.startsWith("/products");
+  const isShop = path.startsWith("/shop");
 
   return (
     <aside className="w-72 shrink-0 border-r border-zinc-200 p-4 bg-white h-screen sticky top-0">
@@ -30,14 +39,37 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <nav className="space-y-2">
-        <Link href="/" className={itemClass(pathname === "/")}>Início</Link>
-        <Link href="/products" className={itemClass(pathname?.startsWith("/products")!)}>Cardápio</Link>
-        <Link href="/shop" className={itemClass(pathname?.startsWith("/shop")!)}>Minha loja</Link>
+      <nav className="space-y-2" aria-label="Navegação principal">
+        <Link
+          href="/"
+          className={itemClass(isHome)}
+          aria-current={isHome ? "page" : undefined}
+        >
+          Início
+        </Link>
+
+        <Link
+          href="/products"
+          className={itemClass(isProducts)}
+          aria-current={isProducts ? "page" : undefined}
+        >
+          Cardápio
+        </Link>
+
+        <Link
+          href="/shop"
+          className={itemClass(isShop)}
+          aria-current={isShop ? "page" : undefined}
+        >
+          Minha loja
+        </Link>
       </nav>
 
       <div className="mt-auto pt-6">
-        <button onClick={handleSignOut} className="w-full rounded-xl border px-4 py-2 hover:bg-zinc-50">
+        <button
+          onClick={handleSignOut}
+          className="w-full rounded-xl border px-4 py-2 hover:bg-zinc-50"
+        >
           Sair
         </button>
       </div>

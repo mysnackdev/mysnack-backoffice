@@ -1,13 +1,21 @@
 "use client";
+
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AuthService } from "@/services/auth.service";
 import { onValue, ref } from "firebase/database";
-import { db } from "@/firebase";
+import { AuthService } from "@/services/auth.service";
+import { db } from "../../../firebase";
 import { useAuth } from "@/context/AuthContext";
 
 type Props = { children: React.ReactNode };
+
+type StoreProfile = Partial<{
+  displayName: string;
+  storeName: string;
+  nome: string;
+  name: string;
+}>;
 
 /**
  * Sidebar recebe o nome da EMPRESA a partir de `backoffice/storeProfile`.
@@ -15,19 +23,33 @@ type Props = { children: React.ReactNode };
  */
 export default function DashboardShell({ children }: Props) {
   const router = useRouter();
-  const handleSignOut = async () => {
-    try { await AuthService.signOut(); } finally { router.replace("/"); }
-  };
   const { user } = useAuth();
   const [storeName, setStoreName] = React.useState<string | null>(null);
 
+  const handleSignOut = async () => {
+    try {
+      await AuthService.signOut();
+    } finally {
+      router.replace("/");
+    }
+  };
+
   React.useEffect(() => {
     const r = ref(db, "backoffice/storeProfile");
-    const off = onValue(r, (snap) => {
-      const v = (snap.val() as any) || {};
-      const name = v.displayName ?? v.storeName ?? v.nome ?? v.name ?? null;
-      setStoreName(name);
-    });
+    const off = onValue(
+      r,
+      (snap) => {
+        const v: StoreProfile | null = snap.exists()
+          ? (snap.val() as StoreProfile)
+          : null;
+        const name = v?.displayName ?? v?.storeName ?? v?.nome ?? v?.name ?? null;
+        setStoreName(name);
+      },
+      (err) => {
+        console.error("onValue(storeProfile) error:", err);
+        setStoreName(null);
+      }
+    );
     return () => off();
   }, []);
 
@@ -51,17 +73,42 @@ export default function DashboardShell({ children }: Props) {
           </div>
 
           <nav className="space-y-1 text-sm">
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/">Início</Link>
-            <div className="mt-3 text-xs uppercase text-zinc-500 px-3">Configurações</div>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">Forma de pagamento</Link>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">Configurações de entrega</Link>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">Horário de funcionamento</Link>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">Minha loja</Link>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">Financeiro</Link>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">Cardápio</Link>
-            <div className="mt-4 border-t pt-3 px-3 text-xs uppercase text-zinc-500">Conta</div>
-  <button onClick={handleSignOut} className="block text-left w-full rounded-md px-3 py-2 hover:bg-zinc-100">Sair</button>
-</nav>
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/">
+              Início
+            </Link>
+
+            <div className="mt-3 text-xs uppercase text-zinc-500 px-3">
+              Configurações
+            </div>
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+              Forma de pagamento
+            </Link>
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+              Configurações de entrega
+            </Link>
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+              Horário de funcionamento
+            </Link>
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+              Minha loja
+            </Link>
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+              Financeiro
+            </Link>
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+              Cardápio
+            </Link>
+
+            <div className="mt-4 border-t pt-3 px-3 text-xs uppercase text-zinc-500">
+              Conta
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="block text-left w-full rounded-md px-3 py-2 hover:bg-zinc-100"
+            >
+              Sair
+            </button>
+          </nav>
         </aside>
 
         {/* Content */}
