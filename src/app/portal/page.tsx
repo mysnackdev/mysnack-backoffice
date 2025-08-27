@@ -1,75 +1,58 @@
 "use client";
-
-import React, { useState, FormEvent } from "react";
-import Image from "next/image";
+import React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
-export default function PortalParceiro() {
-  const [logoSrc, setLogoSrc] = useState<string>("/logo.png");
-  const [email, setEmail] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
+export default function PortalPage() {
+  const { user, role, loading } = useAuth();
+  const params = useSearchParams();
   const router = useRouter();
+  const err = params.get("e");
 
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setLoading(true);
-    router.push(`/login?email=${encodeURIComponent(email)}`);
-  };
+  React.useEffect(() => {
+    if (!loading && !user) router.replace("/login");
+  }, [loading, user, router]);
+
+  if (loading) {
+    return <div className="p-6 text-center text-sm text-zinc-600">Carregando...</div>;
+  }
+
+  const canAccess = role === "admin" || role === "operacao";
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-rose-50 to-rose-100 grid place-items-center px-4 py-10">
-      <div className="w-full max-w-5xl grid gap-8 lg:grid-cols-2 items-stretch">
-        {/* Painel esquerdo */}
-        <section className="rounded-3xl bg-rose-100/80 border shadow-sm p-8 lg:p-12 flex flex-col items-center justify-center text-center">
-          <div className="rounded-full bg-white shadow-md p-3 mb-6">
-            <Image src={logoSrc} alt="Logo" width={120} height={120} className="rounded-full"
-              onError={() => { if (logoSrc !== "/file.svg") setLogoSrc("/file.svg"); }} />
+    <div className="min-h-screen bg-zinc-50 p-6">
+      <div className="mx-auto max-w-2xl space-y-4">
+        <header className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold">Portal</h1>
+          <div className="text-sm text-zinc-600">Usuário: <strong>{user?.email}</strong> • Papel: <strong>{role ?? "unknown"}</strong></div>
+        </header>
+
+        {err === "forbidden" && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+            Seu usuário autenticou, mas ainda não possui papel de acesso (<code>admin</code> / <code>operacao</code>).
+            Peça a um administrador para cadastrar seu papel em <code>backoffice/users/{'{uid}'}/role</code>.
           </div>
-          <h1 className="text-3xl font-semibold">Portal do Parceiro</h1>
-          <p className="mt-2 text-zinc-600">Gerencie sua loja de forma fácil e rápida</p>
-        </section>
+        )}
 
-        {/* Cartão à direita */}
-        <section className="rounded-3xl bg-white border shadow-lg p-8 lg:p-12 flex flex-col justify-center">
-          <h2 className="text-3xl font-semibold text-center">Portal do Parceiro</h2>
-          <p className="mt-2 text-center text-zinc-600">
-            Gerencie sua loja de forma fácil e rápida
-          </p>
-
-          <form onSubmit={onSubmit} className="mt-8">
-            <label className="block text-sm font-medium text-zinc-800">E-mail</label>
-            <input
-              type="email"
-              placeholder="nome@email.com.br"
-              className="mt-2 w-full h-12 rounded-xl border px-4 bg-white"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-
-            <p className="mt-2 text-sm text-zinc-500">
-              Preencha os campos destacados para prosseguir
+        {canAccess ? (
+          <div className="space-y-3">
+            <p className="text-sm text-zinc-700">Acesso liberado. Escolha onde deseja ir:</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Link href="/" className="rounded-xl border bg-white p-4 shadow-sm hover:shadow">📦 Painel de pedidos</Link>
+              <Link href="/settings" className="rounded-xl border bg-white p-4 shadow-sm hover:shadow">⚙️ Configurações (opcional)</Link>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-md border bg-white p-4 shadow-sm text-sm">
+            <p className="mb-2">
+              Você está autenticado mas sem permissão. Enquanto um admin não atribui seu papel,
+              você ainda pode navegar em alguns recursos públicos.
             </p>
-
-            <button
-              type="submit"
-              disabled={!email || loading}
-              className="mt-6 w-full h-12 rounded-xl bg-rose-500 text-white font-medium shadow-[0_6px_0_#d34b4b] active:translate-y-[2px] active:shadow-[0_4px_0_#d34b4b] disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {loading ? "Carregando..." : "Avançar"}
-            </button>
-
-            <p className="mt-6 text-center text-sm">
-              Ainda não tem cadastro? {" "}
-              <Link href="/signup" className="text-rose-600 hover:underline">
-                Cadastre sua loja
-              </Link>
-            </p>
-          </form>
-        </section>
+            <Link className="underline" href="/login">Trocar de conta</Link>
+          </div>
+        )}
       </div>
-    </main>
+    </div>
   );
 }

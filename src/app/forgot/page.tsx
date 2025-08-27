@@ -1,45 +1,59 @@
 "use client";
-
-import {FormEvent, useState} from "react";
-import {sendPasswordResetEmail} from "firebase/auth";
+import React from "react";
 import Link from "next/link";
-import {auth} from "../../../firebase";
+import { useRouter } from "next/navigation";
+import { AuthService } from "@/services/auth.service";
+import { useAuth } from "@/context/AuthContext";
 
 export default function ForgotPage() {
-  const [email, setEmail] = useState(""); const [sent, setSent] = useState(false);
+  const router = useRouter();
+  const { user } = useAuth();
+  const [email, setEmail] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const [sent, setSent] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
 
-  async function onSubmit(e: FormEvent) {
+  React.useEffect(() => {
+    if (user) router.replace("/portal");
+  }, [user, router]);
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+    setLoading(true);
     try {
-      await sendPasswordResetEmail(auth, email);
+      await AuthService.forgot(email);
       setSent(true);
-    } catch {
-      alert("Não foi possível enviar o e-mail de recuperação.");
+    } catch (err: any) {
+      setError(err?.message ?? "Erro ao enviar e-mail de recuperação");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <main className="min-h-screen grid place-items-center p-6">
-      <form onSubmit={onSubmit}
-        className="bg-white w-full max-w-sm rounded-2xl border p-6 space-y-4">
-        <h1 className="text-xl font-semibold">Recuperar senha</h1>
-        <input className="w-full border rounded-xl p-2"
-          placeholder="E-mail" type="email"
-          value={email} onChange={(e)=>setEmail(e.target.value)} required />
-        <button className="w-full rounded-xl bg-zinc-900 text-white p-2">
-          Enviar instruções
-        </button>
-        {sent && (
-          <p className="text-sm text-emerald-700">
-            Verifique seu e-mail para redefinir a senha.
-          </p>
+    <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6">
+      <form onSubmit={onSubmit} className="w-full max-w-sm bg-white rounded-2xl shadow p-6 space-y-4">
+        <h1 className="text-lg font-semibold">Recuperar senha</h1>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {sent ? (
+          <p className="text-sm text-green-700">Enviamos um link de redefinição para <strong>{email}</strong>.</p>
+        ) : (
+          <>
+            <label className="block text-sm">
+              E-mail
+              <input type="email" className="mt-1 w-full rounded-md border p-2" value={email} onChange={(e)=>setEmail(e.target.value)} required />
+            </label>
+            <button disabled={loading} className="w-full rounded-md bg-zinc-900 text-white py-2">
+              {loading? "Enviando..." : "Enviar link"}
+            </button>
+          </>
         )}
-        <div className="text-sm">
-          <Link href="/login" className="text-zinc-700 hover:underline">
-            Voltar ao login
-          </Link>
+        <div className="flex justify-between text-sm">
+          <Link className="underline" href="/login">Voltar ao login</Link>
+          <Link className="underline" href="/signup">Criar conta</Link>
         </div>
       </form>
-    </main>
+    </div>
   );
 }
