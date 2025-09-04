@@ -35,23 +35,22 @@ export default function DashboardShell({ children }: Props) {
   };
 
   React.useEffect(() => {
-    const r = ref(db, "backoffice/storeProfile");
+    if (!user) return;
+    const r = ref(db, `backoffice/tenants/${user.uid}/storeProfile`);
     const off = onValue(
       r,
       (snap) => {
-        const v: StoreProfile | null = snap.exists()
-          ? (snap.val() as StoreProfile)
-          : null;
+        const v: StoreProfile | null = snap.exists() ? (snap.val() as StoreProfile) : null;
         const name = v?.displayName ?? v?.storeName ?? v?.nome ?? v?.name ?? null;
         setStoreName(name);
       },
       (err) => {
-        console.error("onValue(storeProfile) error:", err);
+        console.error("onValue(tenant storeProfile) error:", err);
         setStoreName(null);
       }
     );
     return () => off();
-  }, []);
+  }, [user]);
 
   const userFallback =
     user?.displayName || (user?.email ? user.email.split("@")[0] : null);
@@ -80,22 +79,24 @@ export default function DashboardShell({ children }: Props) {
             <div className="mt-3 text-xs uppercase text-zinc-500 px-3">
               Configurações
             </div>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/payment-methods">
               Forma de pagamento
             </Link>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/delivery-configuration">
               Configurações de entrega
             </Link>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/opening-hours">
               Horário de funcionamento
             </Link>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/my-store">
               Minha loja
             </Link>
             <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
               Financeiro
             </Link>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+
+            {/* AQUI: leva para a nova página */}
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/menus">
               Cardápio
             </Link>
 

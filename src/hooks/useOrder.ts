@@ -1,3 +1,4 @@
+"use client";
 import { useCallback, useState } from "react";
 import { Order } from "@/models";
 import { OrderService } from "@/services";
