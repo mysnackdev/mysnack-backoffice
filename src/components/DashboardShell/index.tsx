@@ -82,7 +82,7 @@ export default function DashboardShell({ children }: Props) {
             <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/payment-methods">
               Forma de pagamento
             </Link>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/delivery-configuration">
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/delivery">
               Configurações de entrega
             </Link>
             <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/opening-hours">
@@ -91,7 +91,7 @@ export default function DashboardShell({ children }: Props) {
             <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/my-store">
               Minha loja
             </Link>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="#">
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/finance">
               Financeiro
             </Link>
 
