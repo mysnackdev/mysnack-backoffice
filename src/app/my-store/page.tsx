@@ -9,6 +9,12 @@ import { Toaster, toast } from "@/components/ui/toast";
 import { useAuth } from "@/context/AuthContext";
 import { evaluateCompleteness, syncSetupStatus } from "@/lib/completeness";
 
+function formatCNPJ(v?: string) {
+  const digits = String(v||"").replace(/\D+/g, "").slice(0,14);
+  if (digits.length !== 14) return v || "—";
+  return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5,8)}/${digits.slice(8,12)}-${digits.slice(12)}`;
+}
+
 type StoreProfile = {
   nome?: string;
   displayName?: string;
@@ -19,7 +25,9 @@ type StoreProfile = {
   telefone?: string;
   minimo?: number;
   id?: string;
-};
+
+  cnpj?: string;
+  razaoSocial?: string;};
 
 type StoreStatus = {
   online?: boolean;
@@ -50,6 +58,8 @@ export default function MinhaLojaPage() {
     telefone: "",
     minimo: 0,
     id: "",
+    cnpj: "",
+    razaoSocial: "",
   });
   const [saving, setSaving] = React.useState(false);
 
@@ -74,6 +84,8 @@ export default function MinhaLojaPage() {
         descricao: v.descricao ?? "",
         categoria: v.categoria ?? prev.categoria ?? "Brasileira",
         telefone: v.telefone ?? "",
+        cnpj: v.cnpj ?? "",
+        razaoSocial: v.razaoSocial ?? "",
         minimo:
           typeof v.minimo === "number"
             ? v.minimo
@@ -414,6 +426,21 @@ export default function MinhaLojaPage() {
 
             {/* Preview à direita */}
             <aside className="lg:col-span-1">
+            {/* Identidade fiscal */}
+            <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <h3 className="text-base font-semibold">Identidade fiscal</h3>
+              <div className="mt-2 space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-600">CNPJ</span>
+                  <span className="font-mono">{formatCNPJ(form.cnpj)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-600">Razão social</span>
+                  <span className="truncate max-w-[60%] text-right">{form.razaoSocial || "—"}</span>
+                </div>
+              </div>
+            </div>
+    
               <div className="rounded-xl border bg-white p-4">
                 <div className="aspect-video w-full rounded-lg bg-pink-100 grid place-items-center text-3xl">
                   📷

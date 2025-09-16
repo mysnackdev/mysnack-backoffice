@@ -3,127 +3,109 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AuthService } from "@/services/auth.service";
+import { AuthService, SignUpInput } from "@/services/auth.service";
 import { useAuth } from "@/context/AuthContext";
 
-// Helpers para extrair mensagem sem usar `any`
 function isErrorWithMessage(e: unknown): e is { message: string } {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    "message" in e &&
-    typeof (e as { message: unknown }).message === "string"
-  );
-}
-function getErrorMessage(err: unknown, fallback = "Erro ao criar conta"): string {
-  if (typeof err === "string") return err;
-  if (isErrorWithMessage(err)) return err.message;
-  return fallback;
+  return typeof e === "object" && e !== null && "message" in e && typeof (e as { message: unknown }).message === "string";
 }
 
 export default function SignupPage() {
   const router = useRouter();
   const { user } = useAuth();
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [role, setRole] = useState<"operacao" | "operador">("operacao");
+
+  // Campos extras
+  const [cnpj, setCnpj] = useState("");          // obrigatório para ambos
+  const [razao, setRazao] = useState("");        // obrigatório para operacao
+
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) router.replace("/portal");
+    if (user) router.replace("/");
   }, [user, router]);
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await AuthService.signUp(name, phone, email, password);
-      router.replace("/portal");
-    } catch (err: unknown) {
-      setError(getErrorMessage(err));
+      const payload: SignUpInput = { name, phone, email, password, role, cnpj, razaoSocial: razao };
+      await AuthService.signUp(payload);
+      router.replace("/");
+    } catch (e) {
+      setError(isErrorWithMessage(e) ? e.message : "Erro ao criar conta");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm bg-white rounded-2xl shadow p-6 space-y-4"
-        aria-busy={loading}
-      >
-        <h1 className="text-lg font-semibold">Criar conta (operação)</h1>
-
+    <div className="min-h-[100vh] grid place-items-center bg-rose-50 p-6">
+      <form onSubmit={onSubmit} className="w-full max-w-xl space-y-4 rounded-2xl bg-white p-6 shadow border">
+        <h1 className="text-xl font-semibold">Criar conta</h1>
         {error && <p className="text-sm text-red-600">{error}</p>}
 
-        <label className="block text-sm">
-          Nome
-          <input
-            className="mt-1 w-full rounded-md border p-2"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoComplete="name"
-            required
-          />
-        </label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setRole("operacao")}
+            className={"px-3 py-1.5 rounded-md border " + (role === "operacao" ? "bg-black text-white" : "bg-white")}
+          >
+            Sou operação
+          </button>
+          <button
+            type="button"
+            onClick={() => setRole("operador")}
+            className={"px-3 py-1.5 rounded-md border " + (role === "operador" ? "bg-black text-white" : "bg-white")}
+          >
+            Sou operador
+          </button>
+        </div>
 
-        <label className="block text-sm">
-          Telefone
-          <input
-            className="mt-1 w-full rounded-md border p-2"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            required
-          />
-        </label>
+        <div className="grid md:grid-cols-2 gap-3">
+          <label className="block text-sm">Nome completo
+            <input className="mt-1 w-full rounded-md border p-2" value={name} onChange={(e)=>setName(e.target.value)} required />
+          </label>
+          <label className="block text-sm">Telefone
+            <input className="mt-1 w-full rounded-md border p-2" value={phone} onChange={(e)=>setPhone(e.target.value)} required />
+          </label>
+        </div>
 
-        <label className="block text-sm">
-          E-mail
-          <input
-            type="email"
-            className="mt-1 w-full rounded-md border p-2"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            inputMode="email"
-            autoComplete="email"
-            required
-          />
-        </label>
+        <div className="grid md:grid-cols-2 gap-3">
+          <label className="block text-sm">E-mail
+            <input type="email" className="mt-1 w-full rounded-md border p-2" value={email} onChange={(e)=>setEmail(e.target.value)} required />
+          </label>
+          <label className="block text-sm">Senha
+            <input type="password" className="mt-1 w-full rounded-md border p-2" value={password} onChange={(e)=>setPassword(e.target.value)} required />
+          </label>
+        </div>
 
-        <label className="block text-sm">
-          Senha
-          <input
-            type="password"
-            className="mt-1 w-full rounded-md border p-2"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-            required
-          />
-        </label>
+        {/* Campos específicos */}
+        <div className="grid md:grid-cols-2 gap-3">
+          <label className="block text-sm">CNPJ {role === "operacao" ? "(da empresa)" : "(da loja)"}
+            <input className="mt-1 w-full rounded-md border p-2" value={cnpj} onChange={(e)=>setCnpj(e.target.value)} required />
+          </label>
+          {role === "operacao" && (
+            <label className="block text-sm">Razão Social
+              <input className="mt-1 w-full rounded-md border p-2" value={razao} onChange={(e)=>setRazao(e.target.value)} required />
+            </label>
+          )}
+        </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-md bg-zinc-900 text-white py-2"
-        >
+        <button type="submit" disabled={loading} className="w-full rounded-md bg-zinc-900 text-white py-2">
           {loading ? "Criando..." : "Criar conta"}
         </button>
 
-        <div className="flex justify-between text-sm">
-          <Link className="underline" href="/login">
-            Já tenho conta
-          </Link>
-          <Link className="underline" href="/forgot">
-            Esqueci minha senha
-          </Link>
+        <div className="text-sm flex justify-between">
+          <Link href="/login" className="underline">Já tenho conta</Link>
+          <Link href="/forgot" className="underline">Esqueci minha senha</Link>
         </div>
       </form>
     </div>

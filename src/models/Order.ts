@@ -1,5 +1,6 @@
 import { OrderResponse } from "@/@types";
-import { nextOrderStatus, prevOrderStatus, setOrderStatus, cancelOrder } from "@/services/order.service";
+import { nextOrderStatus, prevOrderStatus } from "@/constants/order-status";
+import { setOrderStatus, cancelOrder } from "@/services/order.service";
 
 export class Order {
   public user: { name: string };

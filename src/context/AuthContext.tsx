@@ -5,7 +5,7 @@ import {onAuthStateChanged, User} from "firebase/auth";
 import {getDatabase, onValue, ref} from "firebase/database";
 import {auth} from "../../firebase";
 
-export type Role = "admin" | "operacao" | "viewer" | "unknown";
+export type Role = "admin" | "operacao" | "operador" | "viewer" | "unknown";
 type AuthState = { user: User | null; loading: boolean; role: Role };
 
 const Ctx = createContext<AuthState>({
@@ -26,7 +26,7 @@ export function AuthProvider({children}:{children: React.ReactNode}) {
       const r = ref(db, `backoffice/users/${u.uid}/role`);
       const unsub2 = onValue(r, (snap) => {
         const v = (snap.val() as string|null) || "unknown";
-        setRole((v === "admin" || v === "operacao") ? v as Role : "unknown");
+        setRole((v === "admin" || v === "operacao" || v === "operador") ? (v as Role) : "unknown");
       });
       return () => unsub2();
     });

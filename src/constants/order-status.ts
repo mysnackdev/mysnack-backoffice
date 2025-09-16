@@ -20,3 +20,9 @@ export function nextOrderStatus(current: string): OrderStatus | null {
   if (idx >= ORDER_STATUS_FLOW.length - 1) return null;
   return ORDER_STATUS_FLOW[idx + 1];
 }
+
+export function prevOrderStatus(current: string): OrderStatus | null {
+  const idx = (ORDER_STATUS_FLOW as readonly string[]).indexOf(current);
+  if (idx <= 0) return null;
+  return ORDER_STATUS_FLOW[idx - 1];
+}
