@@ -78,9 +78,12 @@ export default function OperatorsCard() {
   }
 
   async function suspend(op: Operator) {
+    if (storeId && op.uid === storeId) { alert('Não é possível suspender a conta de operação desta loja.'); return; }
     if (!storeId) return;
     await suspendOperatorCF({ operatorUid: op.uid, storeId });
   }
+
+  const isOperacao = (uid: string) => storeId && uid === storeId;
 
   return (
     <section className="rounded-xl border p-4">
@@ -104,22 +107,22 @@ export default function OperatorsCard() {
                   {op.phone && <div className="text-xs text-zinc-500">{op.phone}</div>}
                   <div className="mt-1 text-xs">
                     Status:{" "}
-                    {op.approved ? (
+                    {op.approved ? (!isOperacao(op.uid) ? (
                       <span className="text-emerald-600">aprovado</span>
-                    ) : (
+                    ) : null) : (
                       <span className="text-amber-600">aguardando aprovação</span>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  {op.approved ? (
+                  {op.approved ? (!isOperacao(op.uid) ? (
                     <button
                       className="rounded-md border px-3 py-1 text-sm hover:bg-rose-50"
                       onClick={() => suspend(op)}
                     >
                       Suspender
                     </button>
-                  ) : (
+                  ) : null) : (
                     <button
                       className="rounded-md border px-3 py-1 text-sm hover:bg-emerald-50"
                       onClick={() => approve(op)}

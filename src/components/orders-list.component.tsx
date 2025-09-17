@@ -60,7 +60,7 @@ export const Orders = () => {
     const fromTs = from ? new Date(`${from}T00:00:00`).getTime() : 0;
     const toTs = to ? new Date(`${to}T23:59:59`).getTime() : Number.MAX_SAFE_INTEGER;
 
-    return (items as OrderLike[]).filter((it) => {
+    return ((items ?? []) as OrderLike[]).filter((it) => {
       const ts = getCreatedAt(it);
       const okDate = ts >= fromTs && ts <= toTs;
 
