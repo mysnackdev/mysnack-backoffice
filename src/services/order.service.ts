@@ -212,7 +212,7 @@ export const OrderService = {
             active = lastFallback2.length > 0 ? "fallback2" : active;
             cb(lastFallback2);
           }
-        }, logRtdbError("orders/equalTo(storeId)"));
+        }, (e) => console.error("RTDB listen error orders/equalTo(storeId)", e));
         unsubscribes.push(() => upOrders());
       }
 
