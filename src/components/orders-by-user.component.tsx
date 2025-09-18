@@ -6,6 +6,7 @@ import type { OrderResponse } from "@/@types";
 import { Order } from "@/models";
 import { LoadingContainer } from "./loading-container.component";
 import { EmptyState } from "./empty-state.component";
+import StatusBadgeWithActions from "@/components/StatusBadgeWithActions";
 
 export const OrdersByUser: React.FC = () => {
   const [uid, setUid] = useState<string>("");
@@ -87,6 +88,7 @@ export const OrdersByUser: React.FC = () => {
                   >
                     {item.status.label}
                   </span>
+<StatusBadgeWithActions status={item.data.status} orderId={item.data.key} />
                 </div>
 
                 {item.onClick && (

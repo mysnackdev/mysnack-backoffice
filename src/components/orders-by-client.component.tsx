@@ -4,6 +4,7 @@ import React from "react";
 import { useOrdersByClient } from "@/hooks/useOrdersByClient";
 import { LoadingContainer } from "./loading-container.component";
 import { EmptyState } from "./empty-state.component";
+import StatusBadgeWithActions from "@/components/StatusBadgeWithActions";
 
 function initials(name: string) {
   const parts = (name || "").trim().split(/\s+/);
@@ -68,10 +69,12 @@ export const OrdersByClient: React.FC = () => {
                             <div className="text-xs text-zinc-500">
                               {new Date(o.createdAt).toLocaleString()}
                             </div>
+                            <StatusBadgeWithActions status={o.status} orderId={o.key} />
                           </li>
                         ))}
                     </ul>
-                  </div>
+                  
+</div>
                 </details>
               </li>
             ))}

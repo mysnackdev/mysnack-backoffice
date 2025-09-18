@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { app } from "@/firebase";
 import { useOperatorApproval } from "@/hooks/useOperatorApproval";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -12,7 +11,7 @@ import { usePathname, useRouter } from "next/navigation";
  */
 export default function RedirectOperatorGuard({ children }: { children: React.ReactNode }) {
   const { role } = useAuth();
-  const { loading, approved } = useOperatorApproval(app);
+  const { loading, approved } = useOperatorApproval();
   const pathname = usePathname();
   const router = useRouter();
   const WAIT_PATH = "/aguarde-aprovacao";

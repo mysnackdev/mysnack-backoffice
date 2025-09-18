@@ -4,6 +4,7 @@ import React from "react";
 import { subscribeAllOrders, subscribeOrdersByStore, type StoreMirrorOrder } from "@/services/orders.mirror.service";
 import { useAuth } from "@/context/AuthContext";
 import { useOperatorApproval } from "@/hooks/useOperatorApproval";
+import StatusBadgeWithActions from "@/components/StatusBadgeWithActions";
 
 type OrderCard = {
   id: string;
@@ -96,6 +97,7 @@ export default function OrdersGrid() {
             <span className="text-xs px-2 py-0.5 rounded-full border border-zinc-300 text-zinc-700">
               {o.status || "—"}
             </span>
+<StatusBadgeWithActions status={ o.status } orderId={o.id} />
           </header>
           <p className="text-sm text-zinc-600">Criado: {formatDate(o.createdAt)}</p>
           <p className="text-sm text-zinc-600">

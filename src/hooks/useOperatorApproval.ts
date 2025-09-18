@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getAuth } from "firebase/auth";
 import { getDatabase, ref, onValue } from "firebase/database";
-import type { FirebaseApp } from "firebase/app";
-
 export type ApprovalState = {
   loading: boolean;
   approved: boolean;
@@ -21,7 +19,7 @@ export type ApprovalState = {
  *  A) /backoffice/operators/{uid}  (approved, storeId)
  *  B) /backoffice/users/{uid}/storeId  -> /backoffice/tenants/{storeId}/operators/{uid}/approved
  */
-export function useOperatorApproval(app: FirebaseApp): ApprovalState {
+export function useOperatorApproval(): ApprovalState {
   const [state, setState] = useState<ApprovalState>({
     loading: true,
     approved: false,
@@ -53,7 +51,7 @@ export function useOperatorApproval(app: FirebaseApp): ApprovalState {
 
   useEffect(() => {
     const auth = getAuth();
-    const db = getDatabase(app);
+    const db = getDatabase();
     let unsubs: Array<() => void> = [];
 
     const stop = () => {
@@ -145,7 +143,7 @@ export function useOperatorApproval(app: FirebaseApp): ApprovalState {
       offAuth();
       stop();
     };
-  }, [app]);
+  }, []);
 
   return state;
 }

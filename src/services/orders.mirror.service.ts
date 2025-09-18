@@ -1,6 +1,6 @@
 
 import { db } from "../../firebase";
-import { onValue, off, query, ref, orderByChild } from "firebase/database";
+import { onValue, off, query, ref, orderByChild, DataSnapshot } from "firebase/database";
 
 export type StoreMirrorOrder = {
   key: string;
@@ -16,15 +16,30 @@ export type StoreMirrorOrder = {
   lastItem?: string | null;
 };
 
+
+
+type StoreMirrorOrderRaw = {
+  userId?: string | null;
+  userName?: string | null;
+  status?: string;
+  createdAt?: number;
+  cancelled?: boolean;
+  total?: number;
+  number?: string | null;
+  items?: unknown[] | null;
+  itemsCount?: number | null;
+  storeId?: string | null;
+  lastItem?: string | null;
+};
 export function subscribeOrdersByStore(
   storeId: string,
   cb: (orders: StoreMirrorOrder[]) => void
 ): () => void {
   const r = query(ref(db, `orders_by_store/${storeId}`), orderByChild("createdAt"));
-  const handler = (snap: any) => {
+  const handler = (snap: DataSnapshot) => {
     const v = snap.val() || {};
-    const list: StoreMirrorOrder[] = Object.entries(v)
-      .map(([key, val]: [string, any]) => ({
+    const list: StoreMirrorOrder[] = Object.entries(v as Record<string, StoreMirrorOrderRaw>)
+      .map(([key, val]) => ({
         key,
         userId: val?.userId ?? null,
         status: String(val?.status ?? "pedido realizado"),
@@ -49,10 +64,10 @@ export function subscribeOrdersByStore(
 
 export function subscribeAllOrders(cb: (orders: StoreMirrorOrder[]) => void): () => void {
   const r = query(ref(db, `orders`), orderByChild("createdAt"));
-  const handler = (snap: any) => {
+  const handler = (snap: DataSnapshot) => {
     const v = snap.val() || {};
-    const list: StoreMirrorOrder[] = Object.entries(v)
-      .map(([key, val]: [string, any]) => ({
+    const list: StoreMirrorOrder[] = Object.entries(v as Record<string, StoreMirrorOrderRaw>)
+      .map(([key, val]) => ({
         key,
         userId: val?.userId ?? null,
         status: String(val?.status ?? "pedido realizado"),

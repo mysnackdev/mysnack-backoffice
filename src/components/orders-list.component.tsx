@@ -122,6 +122,7 @@ export const Orders = () => {
           <EmptyState />
         )}
       </LoadingContainer>
-    </div>
+    
+</div>
   );
 };

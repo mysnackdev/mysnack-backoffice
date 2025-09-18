@@ -2,8 +2,6 @@
 
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import type { FirebaseApp } from "firebase/app";
-import { app } from "../../../firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useOperatorApproval } from "@/hooks/useOperatorApproval";
 /**
@@ -17,7 +15,7 @@ export default function ApprovalEnforcer({ children }: { children: React.ReactNo
   const pathname = usePathname();
 
   const { user, role, loading } = useAuth();
-  const { loading: loadingApproval, approved } = useOperatorApproval(app as FirebaseApp);
+  const { loading: loadingApproval, approved } = useOperatorApproval();
   // Opcional: se desejar validar acesso real ao tenant, descomente a linha abaixo
 
   React.useEffect(() => {

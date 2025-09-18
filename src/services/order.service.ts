@@ -1,8 +1,9 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ref, onValue, update, query, orderByChild, limitToLast, DataSnapshot, get, equalTo } from "firebase/database";
+import { ref, onValue, off, update, query, orderByChild, limitToLast, DataSnapshot, get, equalTo } from "firebase/database";
 import { db } from "../../firebase";
 import { getUsersBasicCF } from "./operator.service";
+import type { OrderResponse } from "@/@types";
 
 export type OrderStatus =
   | "pedido realizado"
@@ -70,11 +71,11 @@ function snapshotToList(snap: DataSnapshot): Order[] {
 }
 
 async function attachUsers(list: Order[]) {
-  const uids = Array.from(new Set(list.map((o) => o.userId).filter(Boolean)));
+  const uids = Array.from(new Set(list.map((o) => o.uid).filter(Boolean)));
   if (!uids.length) return list;
   try {
     const users = await getUsersBasicCF(uids);
-    return list.map((o) => ({ ...o, userName: users?.[o.userId]?.name || o.userName }));
+    return list.map((o) => ({ ...o, userName: users?.[o.uid]?.name || o.userName }));
   } catch (e) {
     console.warn("attachUsers failed", e);
     return list;
@@ -98,19 +99,19 @@ async function resolveTenantKey(uid: string): Promise<{ tenant: string; profileI
 
 export const OrderService = {
   subscribeOrders(params: { role: "admin" | "operacao" | "operador" | "unknown"; uid: string }, cb: (orders: Order[]) => void) {
-    if (!params?.userId || (params.role !== "admin" && params.role !== "operacao" && params.role !== "operador")) {
+    if (!params?.uid || (params.role !== "admin" && params.role !== "operacao" && params.role !== "operador")) {
       cb([]);
       return () => {};
     }
 
-    let unsubscribes: Array<() => void> = [];
+    const unsubscribes: Array<() => void> = [];
     let active: "primary" | "fallback1" | "fallback2" | null = null;
     let lastPrimary: Order[] = [];
     let lastFallback1: Order[] = [];
     let lastFallback2: Order[] = [];
 
     (async () => {
-      const { tenant, profileId } = await resolveTenantKey(params.userId);
+      const { tenant, profileId } = await resolveTenantKey(params.uid);
       const primaryPath = `orders_by_store/${tenant}`;
       const fallbackPath1 = `orders_by_store/${tenant}`;
       const fallbackPath2 = profileId ? `orders_by_store/${profileId}` : null;
@@ -238,6 +239,30 @@ export const OrderService = {
         try { u(); } catch {}
       }
     };
+  },
+
+
+  subscribeOrdersByUser(uid: string, cb: (orders: OrderResponse[]) => void): () => void {
+    try {
+      const r = query(ref(db, "orders"), orderByChild("userId"), equalTo(uid));
+      const handler = (snap: DataSnapshot) => {
+        const v = snap.val() || {};
+        const list: OrderResponse[] = Object.entries(v).map(([key, val]: [string, any]) => ({
+          key,
+          nome: String((val && (val.userName || val.nome)) || "Usuário"),
+          status: String(val?.status ?? "pedido realizado"),
+          createdAt: Number(val?.createdAt ?? 0),
+          cancelled: !!val?.cancelled,
+        })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        cb(list);
+      };
+      onValue(r, handler, (e) => console.warn("listen orders by user error", e));
+      return () => off(r, "value", handler);
+    } catch (e: any) {
+      console.error("subscribeOrdersByUser error", e?.message || e);
+      cb([]);
+      return () => {};
+    }
   },
 
   async setOrderStatus(orderId: string, status: OrderStatus) {

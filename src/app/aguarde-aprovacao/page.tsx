@@ -3,14 +3,13 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { signOut } from "firebase/auth";
-import { auth, app } from "../../../firebase";
-import type { FirebaseApp } from "firebase/app";
+import { auth } from "../../../firebase";
 import { useOperatorApproval } from "@/hooks/useOperatorApproval";
 
 export default function Page() {
   const { user } = useAuth();
   const router = useRouter();
-  const { approved, loading } = useOperatorApproval(app as FirebaseApp);
+  const { approved, loading } = useOperatorApproval();
 
   React.useEffect(() => {
     if (!loading && approved) {

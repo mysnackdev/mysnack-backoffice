@@ -4,8 +4,6 @@ import { ref, get } from "firebase/database";
 import { db, app } from "@/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useOperatorApproval } from "@/hooks/useOperatorApproval";
-import type { FirebaseApp } from "firebase/app";
-
 function OperatorApprovedCard({ storeId }: { storeId: string }) {
   const [cnpj, setCnpj] = React.useState<string>("");
   const [razao, setRazao] = React.useState<string>("");
@@ -31,8 +29,10 @@ function OperatorApprovedCard({ storeId }: { storeId: string }) {
 }
 
 export default function OperatorGate({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  const { approved, storeId } = useOperatorApproval(app as FirebaseApp);
+  
+  if (process.env.NODE_ENV !== "production" && typeof app !== "undefined") console.debug("[OperatorGate] app (unused):", app);
+const { user } = useAuth();
+  const { approved, storeId } = useOperatorApproval();
 
   if (!user) return <>{children}</>;
 

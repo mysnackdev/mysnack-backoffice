@@ -1,9 +1,9 @@
-import React, { PropsWithChildren } from "react";
 import type { FirebaseApp } from "firebase/app";
+import React, { PropsWithChildren } from "react";
 import { useOperatorApproval } from "../../hooks/useOperatorApproval";
 
 type Props = PropsWithChildren<{
-  app: FirebaseApp;
+  app?: FirebaseApp;
   role: "operador" | "operacao" | "admin" | string | undefined;
   pendingUI?: React.ReactNode;
 }>;
@@ -18,7 +18,10 @@ const DefaultPending = () => (
 );
 
 export default function ApprovalGate({ app, role, children, pendingUI }: Props) {
-  const { loading, approved } = useOperatorApproval(app);
+  
+  if (process.env.NODE_ENV != "production" && app) console.debug("[ApprovalGate] app (unused):", app);
+
+  const { loading, approved } = useOperatorApproval();
 
   // Dono/operacao/admin seguem acessando normalmente
   if (role === "operacao" || role === "admin") return <>{children}</>;

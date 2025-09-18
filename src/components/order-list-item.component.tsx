@@ -1,3 +1,4 @@
+"use client";
 import { Order } from "@/models";
 
 export const OrderListItem = ({ item }: { item: Order }) => {
@@ -41,7 +42,7 @@ export const OrderListItem = ({ item }: { item: Order }) => {
           >
             Cancelar
           </button>
-        </div>
+</div>
       )}
     </li>
   );

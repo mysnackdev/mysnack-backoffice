@@ -23,7 +23,7 @@ export function AuthProvider({children}:{children: React.ReactNode}) {
       setLoading(false);
       if (!u) { setRole("unknown"); return; }
       const db = getDatabase();
-      const r = ref(db, `backoffice/users/${u.userId}/role`);
+      const r = ref(db, `backoffice/users/${u.uid}/role`);
       const unsub2 = onValue(r, (snap) => {
         const v = (snap.val() as string|null) || "unknown";
         setRole((v === "admin" || v === "operacao" || v === "operador") ? (v as Role) : "unknown");
