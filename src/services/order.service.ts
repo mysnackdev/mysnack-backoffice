@@ -48,7 +48,7 @@ function snapshotToList(snap: DataSnapshot): Order[] {
     const v: any = c.val() || {};
     arr.push({
       key: String(c.key),
-      uid: String(v.uid || ""),
+      uid: String(v.userId || ""),
       userName: v.userName || "Usuário",
       status: String(v.status || "pedido realizado") as OrderStatus,
       createdAt: Number(v.createdAt || 0),
@@ -70,11 +70,11 @@ function snapshotToList(snap: DataSnapshot): Order[] {
 }
 
 async function attachUsers(list: Order[]) {
-  const uids = Array.from(new Set(list.map((o) => o.uid).filter(Boolean)));
+  const uids = Array.from(new Set(list.map((o) => o.userId).filter(Boolean)));
   if (!uids.length) return list;
   try {
     const users = await getUsersBasicCF(uids);
-    return list.map((o) => ({ ...o, userName: users?.[o.uid]?.name || o.userName }));
+    return list.map((o) => ({ ...o, userName: users?.[o.userId]?.name || o.userName }));
   } catch (e) {
     console.warn("attachUsers failed", e);
     return list;
@@ -98,7 +98,7 @@ async function resolveTenantKey(uid: string): Promise<{ tenant: string; profileI
 
 export const OrderService = {
   subscribeOrders(params: { role: "admin" | "operacao" | "operador" | "unknown"; uid: string }, cb: (orders: Order[]) => void) {
-    if (!params?.uid || (params.role !== "admin" && params.role !== "operacao" && params.role !== "operador")) {
+    if (!params?.userId || (params.role !== "admin" && params.role !== "operacao" && params.role !== "operador")) {
       cb([]);
       return () => {};
     }
@@ -110,10 +110,10 @@ export const OrderService = {
     let lastFallback2: Order[] = [];
 
     (async () => {
-      const { tenant, profileId } = await resolveTenantKey(params.uid);
-      const primaryPath = `backoffice/ordersByTenant/${tenant}`;
-      const fallbackPath1 = `order_by_store/${tenant}`;
-      const fallbackPath2 = profileId ? `order_by_store/${profileId}` : null;
+      const { tenant, profileId } = await resolveTenantKey(params.userId);
+      const primaryPath = `orders_by_store/${tenant}`;
+      const fallbackPath1 = `orders_by_store/${tenant}`;
+      const fallbackPath2 = profileId ? `orders_by_store/${profileId}` : null;
 
       // initial load (defensive)
       try {
