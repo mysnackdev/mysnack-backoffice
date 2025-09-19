@@ -1,4 +1,3 @@
-
 {
   "hosting": {
     "site": "mysnack-backoffice-6fb29",
@@ -13,6 +12,7 @@
         "source": "**",
         "destination": "/index.html"
       }
-    ]
+    ],
+    "cleanUrls": true
   }
 }

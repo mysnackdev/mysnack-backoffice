@@ -51,7 +51,7 @@ export default function AdvanceCancelButtons({ orderId, status, className }: Pro
         aria-label="Avançar para o próximo status"
         title={nxt ? `Avançar para: ${nxt}` : "Avançar"}
       >
-        {busy === "advance" ? "Avançando..." : (nxt ? `Avançar (${nxt})` : "Avançar")}
+        {busy === "advance" ? "Avançando..." : "Avançar"}
       </button>
     </div>
   );

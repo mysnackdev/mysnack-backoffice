@@ -1,70 +1,38 @@
-
 "use client";
-import React from "react";
-import { subscribeAllOrders, subscribeOrdersByStore, type StoreMirrorOrder } from "@/services/orders.mirror.service";
+import React, { useEffect, useState } from "react";
+import { fetchMyStoreOrdersEnriched, type EnrichedOrder } from "@/services/orders.enriched.service";
 import { useAuth } from "@/context/AuthContext";
-import { useOperatorApproval } from "@/hooks/useOperatorApproval";
 import StatusBadgeWithActions from "@/components/StatusBadgeWithActions";
 
-type OrderCard = {
-  id: string;
-  createdAt: number;
-  status: string;
-  itemsCount: number | null;
-  userId: string | null;
-  storeId: string | null;
-};
-
-function formatDate(ts?: number) {
-  if (!ts) return "—";
-  try {
-    const d = new Date(ts);
-    return new Intl.DateTimeFormat("pt-BR", {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(d);
-  } catch {
-    return String(ts);
-  }
+function formatDate(ts: number) {
+  try { return new Date(ts).toLocaleString("pt-BR"); } catch { return ""; }
 }
 
 export default function OrdersGrid() {
   const { role } = useAuth();
-  const { approved, storeId } = useOperatorApproval();
-  const [loading, setLoading] = React.useState(true);
-  const [orders, setOrders] = React.useState<OrderCard[]>([]);
+  const [orders, setOrders] = useState<EnrichedOrder[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  React.useEffect(() => {
-    setLoading(true);
-    let unsub: (() => void) | undefined;
-
-    const handle = (list: StoreMirrorOrder[]) => {
-      const mapped: OrderCard[] = list
-        .map((o) => ({
-          id: o.key,
-          createdAt: Number(o.createdAt || 0),
-          status: String(o.status || ""),
-          itemsCount: typeof o.itemsCount === "number" ? o.itemsCount : null,
-          userId: o.userId ?? null,
-          storeId: (o.storeId as string | null) ?? null,
-        }))
-        .sort((a, b) => b.createdAt - a.createdAt);
-      setOrders(mapped);
-      setLoading(false);
-    };
-
-    const canOperator = !!storeId && (approved || role === "admin" || role === "operacao");
-    if (canOperator) {
-      unsub = subscribeOrdersByStore(storeId!, handle);
-    } else if (role === "admin" || role === "operacao") {
-      unsub = subscribeAllOrders(handle);
-    } else {
-      setOrders([]);
-      setLoading(false);
+  useEffect(() => {
+    let cancelled = false as boolean;
+    async function load() {
+      setLoading(true);
+      try {
+        if ((role === "operador" || role === "operacao" || role === "admin")) {
+          const list = await fetchMyStoreOrdersEnriched(undefined, 100);
+          if (!cancelled) setOrders(list);
+        } else {
+          if (!cancelled) setOrders([]);
+        }
+      } catch {
+        if (!cancelled) setOrders([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-
-    return () => unsub?.();
-  }, [role, approved, storeId]);
+    load();
+    return () => { cancelled = true; };
+  }, [role]);
 
   if (loading) {
     return (
@@ -91,17 +59,14 @@ export default function OrdersGrid() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
       {orders.map((o) => (
-        <article key={o.id} className="rounded-xl border border-zinc-200 p-4 hover:shadow-sm transition">
-          <header className="flex items-center justify-between mb-1">
-            <h3 className="font-medium text-zinc-900">Pedido #{o.id.slice(-6)}</h3>
-            <span className="text-xs px-2 py-0.5 rounded-full border border-zinc-300 text-zinc-700">
-              {o.status || "—"}
-            </span>
-<StatusBadgeWithActions status={ o.status } orderId={o.id} />
+        <article key={o.id} className="rounded-xl border border-zinc-200 p-4 bg-white">
+          <header className="flex items-start justify-between mb-2">
+            <h3 className="font-semibold text-lg">Pedido <span className="text-zinc-500">#{String(o.number || o.id).slice(-5)}</span></h3>
+            <StatusBadgeWithActions status={o.status} orderId={o.id} />
           </header>
           <p className="text-sm text-zinc-600">Criado: {formatDate(o.createdAt)}</p>
           <p className="text-sm text-zinc-600">
-            Itens: {o.itemsCount ?? "—"} · Cliente: {o.userId ? o.userId.slice(0, 6) + "…" : "—"}
+            Itens: {o.itemsCount ?? "—"}{o.itemsPreview && o.itemsPreview.length ? ` · Ex.: ${o.itemsPreview.join(', ')}` : (o.lastItem ? ` · Último: ${o.lastItem}` : "")} · Cliente: {o.userName || (o.userId ? o.userId.slice(0, 6) + "…" : "—")}
           </p>
           {o.storeId && (
             <p className="text-xs text-zinc-500 mt-1">
