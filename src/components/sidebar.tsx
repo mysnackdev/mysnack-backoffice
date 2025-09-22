@@ -4,10 +4,9 @@ import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
-import { auth } from "../../firebase";
+import { ref, onValue } from "firebase/database";
+import { auth, db } from "../../firebase";
 import { useAuth } from "@/context/AuthContext";
-import { onValue, ref } from "firebase/database";
-import { db } from "../../firebase";
 
 function itemClass(active: boolean) {
   return "block px-4 py-2 rounded-xl " + (active ? "bg-zinc-900 text-white" : "hover:bg-zinc-100");
@@ -15,6 +14,7 @@ function itemClass(active: boolean) {
 
 export default function Sidebar() {
   const { user } = useAuth();
+  const [role, setRole] = React.useState<string | null>(null);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -22,6 +22,9 @@ export default function Sidebar() {
 
   React.useEffect(() => {
     if (!user) return;
+    // Subscribe to role
+    const rRole = ref(db, `backoffice/users/${user.uid}/role`);
+    const offRole = onValue(rRole, (snap) => setRole(snap.exists() ? String(snap.val()) : null), () => setRole(null));
     const r = ref(db, `backoffice/tenants/${user.uid}/storeProfile`);
     const off = onValue(
       r,
@@ -32,7 +35,7 @@ export default function Sidebar() {
       },
       () => setStoreName(null)
     );
-    return () => off();
+    return () => { off(); offRole(); };
   }, [user]);
 
   async function handleSignOut() {
@@ -44,6 +47,26 @@ export default function Sidebar() {
   }
 
   // ✅ normalize pathname -> string e derive booleans
+  // 🔒 Sidebar específico para ADMIN
+  if (role === "admin" || role === "operacao") {
+    return (
+      <aside className="min-h-screen w-full max-w-[280px] border-r bg-white p-6 hidden md:block">
+        <div className="mb-6">
+          <div className="text-xl font-semibold">MySnack</div>
+          <div className="text-xs text-zinc-500 mt-1">Painel do administrador</div>
+        </div>
+
+        <nav className="space-y-2">
+          <Link href="/" className={itemClass(true)} aria-current="page">Início</Link>
+        </nav>
+
+        <div className="mt-auto pt-6">
+          <button onClick={handleSignOut} className="w-full rounded-xl border px-4 py-2 hover:bg-zinc-50">Sair</button>
+        </div>
+      </aside>
+    );
+  }
+
   const path = pathname ?? "";
   const isHome     = path === "/";
   const isMenus    = path.startsWith("/menus");

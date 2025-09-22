@@ -1,19 +1,19 @@
 "use client";
 import React from "react";
-import Image from "next/image";
-import { getStoresStatusCF, listShoppingsCF, createShoppingCF, StoreSummary, type Shop } from "@/services/admin.service";
+import Link from "next/link";
+import { getStoresStatusCF, listShoppingsCF, createShoppingCF, updateShoppingCF, type StoreSummary, type Shop } from "@/services/admin.service";
 
 export default function AdminHome() {
   const [stores, setStores] = React.useState<StoreSummary[]>([]);
   const [shoppings, setShoppings] = React.useState<Shop[]>([]);
-  const [newShop, setNewShop] = React.useState({ name: "", slug: "" });
+  const [newShop, setNewShop] = React.useState<{ name: string; slug: string }>({ name: "", slug: "" });
 
   React.useEffect(() => {
     (async () => {
       const s = await getStoresStatusCF();
       setStores(s.stores);
       const res = await listShoppingsCF();
-      setShoppings(res.shoppings || []);
+      setShoppings(res.shoppings ?? []);
     })();
   }, []);
 
@@ -42,33 +42,74 @@ export default function AdminHome() {
       </section>
 
       <section className="rounded-xl border p-4">
-        <div className="text-lg font-semibold mb-3">Shoppings</div>
-        <form onSubmit={create} className="flex gap-2 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-lg font-semibold">Shoppings</div>
+        </div>
+
+        {/* Novo shopping */}
+        <form onSubmit={create} className="grid sm:grid-cols-3 gap-2 mb-4">
           <input
-            className="border rounded-lg px-2 py-1 flex-1"
-            placeholder="Nome"
             value={newShop.name}
             onChange={(e) => setNewShop((p) => ({ ...p, name: e.target.value }))}
+            placeholder="Nome do shopping"
+            className="border rounded-lg px-3 py-2"
           />
           <input
-            className="border rounded-lg px-2 py-1"
-            placeholder="slug"
             value={newShop.slug}
             onChange={(e) => setNewShop((p) => ({ ...p, slug: e.target.value }))}
+            placeholder="slug"
+            className="border rounded-lg px-3 py-2"
           />
-          <button className="border rounded-lg px-3 py-1">Criar</button>
+          <button className="border rounded-lg px-3 py-2">Criar</button>
         </form>
 
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {shoppings.map((shop) => {
-            const base = typeof window !== "undefined" ? window.location.origin : "";
-            const url = `${base}/s/${shop.slug}`;
-            const qr = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
+        {/* Lista de shoppings */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {shoppings.map((shop, idx) => {
+            const slug = shop.slug;
             return (
-              <div key={shop.slug} className="border rounded-lg p-3 flex flex-col items-center gap-2">
-                <div className="font-semibold">{shop.name}</div>
-                <Image src={qr} alt="QR code" width={160} height={160} className="w-40 h-40 rounded-md border" />
-                <div className="text-xs break-all text-center">{url}</div>
+              <div key={`${slug ?? "shopping"}-${idx}`} className="border rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold">{shop.name}</div>
+                  {slug ? (
+                    <Link href={`/shopping?slug=${slug}`} className="text-blue-600 text-sm underline">
+                      Detalhes
+                    </Link>
+                  ) : null}
+                </div>
+                <div className="text-xs text-muted-foreground">slug: {slug || "-"}</div>
+
+                {/* Atualização rápida de endereço/lat/lng */}
+                {slug ? (
+                  <form
+                    className="grid gap-2"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const formEl = e.currentTarget as HTMLFormElement;
+                      const fd = new FormData(formEl);
+                      const address = String(fd.get("address") || "");
+                      const lat = Number(fd.get("lat"));
+                      const lng = Number(fd.get("lng"));
+                      const updated = await updateShoppingCF({
+                        slug,
+                        address: address || undefined,
+                        lat: Number.isFinite(lat) ? lat : undefined,
+                        lng: Number.isFinite(lng) ? lng : undefined,
+                      });
+                      setShoppings((prev) =>
+                        prev.map((it) => (it.slug === slug ? { ...it, ...updated } : it))
+                      );
+                      formEl.reset();
+                    }}
+                  >
+                    <input name="address" defaultValue={shop.address ?? ""} className="border rounded-lg px-2 py-1" placeholder="Endereço" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input name="lat" defaultValue={String(shop.lat ?? "")} className="border rounded-lg px-2 py-1" placeholder="Lat" />
+                      <input name="lng" defaultValue={String(shop.lng ?? "")} className="border rounded-lg px-2 py-1" placeholder="Lng" />
+                    </div>
+                    <button className="border rounded-lg px-3 py-1 justify-self-start">Salvar</button>
+                  </form>
+                ) : null}
               </div>
             );
           })}
