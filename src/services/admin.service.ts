@@ -5,7 +5,7 @@ const functions = getFunctions(app, "us-central1");
 
 type ListShoppingsRaw = { items?: Shop[] } | Shop[] | Record<string, Shop>;
 
-export type StoreSummary = {
+export type StoreSummary = { shoppingSlug?: string; approved?: boolean; suspended?: boolean; displayName?: string; location?: string; imageUrl?: string;
   id: string;
   name: string;
   categoria?: string;
@@ -78,4 +78,22 @@ export async function deleteChairCF(input: { slug: string; id: string }){
   const fn = httpsCallable<typeof input, { ok: true }>(functions, "deleteChair");
   await fn(input);
   return true;
+}
+
+
+// --- Shopping & Store linking (new) ---
+export async function linkStoreToShoppingCF(input: { storeId: string; shoppingSlug: string }) {
+  const fn = httpsCallable<typeof input, { ok: true }>(functions, "linkStoreToShopping");
+  const res = await fn(input);
+  return res.data;
+}
+export async function approveStoreInShoppingCF(input: { shoppingSlug: string; storeId: string }) {
+  const fn = httpsCallable<typeof input, { ok: true }>(functions, "approveStoreInShopping");
+  const res = await fn(input);
+  return res.data;
+}
+export async function suspendStoreInShoppingCF(input: { shoppingSlug: string; storeId: string; suspended: boolean }) {
+  const fn = httpsCallable<typeof input, { ok: true }>(functions, "suspendStoreInShopping");
+  const res = await fn(input);
+  return res.data;
 }

@@ -23,7 +23,7 @@ type StoreProfile = Partial<{
  */
 export default function DashboardShell({ children }: Props) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [storeName, setStoreName] = React.useState<string | null>(null);
 
   const handleSignOut = async () => {
@@ -66,12 +66,36 @@ export default function DashboardShell({ children }: Props) {
             <div className="text-xs text-zinc-500">{company}</div>
           </div>
 
-          <div className="mb-4 rounded-lg border bg-rose-50 p-3 text-sm">
-            <div className="font-medium text-rose-700">Loja fechada</div>
-            <div className="text-rose-700/80">Em configuração</div>
-          </div>
+          {role !== "admin" && (
+            <div className="mb-4 rounded-lg border bg-rose-50 p-3 text-sm">
+              <div className="font-medium text-rose-700">Loja fechada</div>
+              <div className="text-rose-700/80">Em configuração</div>
+            </div>
+          )}
 
-          <nav className="space-y-1 text-sm">
+          {role === "admin" ? (
+<nav className="space-y-1 text-sm">
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/">
+              Início (Admin)
+            </Link>
+            <div className="mt-3 text-xs uppercase text-zinc-500 px-3">
+              Administração
+            </div>
+            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/shopping">
+              Shoppings
+            </Link>
+            <div className="mt-4 border-t pt-3 px-3 text-xs uppercase text-zinc-500">
+              Conta
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="block text-left w-full rounded-md px-3 py-2 hover:bg-zinc-100"
+            >
+              Sair
+            </button>
+          </nav>
+) : (
+<nav className="space-y-1 text-sm">
             <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/">
               Início
             </Link>
@@ -94,8 +118,6 @@ export default function DashboardShell({ children }: Props) {
             <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/finance">
               Financeiro
             </Link>
-
-            {/* AQUI: leva para a nova página */}
             <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/menus">
               Cardápio
             </Link>
@@ -110,6 +132,7 @@ export default function DashboardShell({ children }: Props) {
               Sair
             </button>
           </nav>
+)}
         </aside>
 
         {/* Content */}

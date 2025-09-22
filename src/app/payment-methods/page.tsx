@@ -120,7 +120,12 @@ export default function PaymentMethodsPage() {
     if (!user) return;
     setSaving(true);
     try {
-      await update(ref(db, `backoffice/tenants/${user.uid}/payments`), state);
+      const allowedOnDelivery = state.onDelivery.filter((x) => debito.includes(x) || credito.includes(x));
+      const allowedBanking = state.banking.filter((x) => x === 'Pix');
+      await update(ref(db, `backoffice/tenants/${user.uid}/payments`), {
+        onDelivery: allowedOnDelivery,
+        banking: allowedBanking,
+      });
       await update(ref(db, `backoffice/tenants/${user.uid}/storeProfile`), {
         updatedAt: Date.now(),
       });
@@ -146,11 +151,12 @@ export default function PaymentMethodsPage() {
   const debito = ["Visa", "Mastercard", "Elo", "Banricompras"];
   const credito = ["Nugo", "Hipercard", "Banricompras", "Visa", "Elo", "Good Card", "Amex", "Mastercard"];
   const carteiraDigital = ["Visa", "Visa Débito", "Visa", "Mastercard", "Elo Débito", "Saldo Da Carteira"];
-  const bankingOptions = ["Pix", "Nubank"]; // ✅ usado abaixo (não dá warning)
+  const bankingOptions = ["Pix"]; // ✅ usado abaixo (não dá warning)
 
   // Sugestão simples para o botão "Aceitar recomendações"
   const acceptRecommendations = () => {
-    const recOnDelivery = ["Dinheiro", "Visa", "Mastercard", "VR Refeição", "Alelo Refeição"];
+    // Apenas opções visíveis no momento
+    const recOnDelivery = ["Visa", "Mastercard"];
     setState((s) => ({
       ...s,
       onDelivery: Array.from(new Set([...s.onDelivery, ...recOnDelivery])),
@@ -195,6 +201,7 @@ export default function PaymentMethodsPage() {
         <div className="space-y-6">
           <h2 className="text-2xl font-semibold text-zinc-900">Pagamento na entrega</h2>
 
+          {false && (
           <Section title="Vale-refeição">
             {valeRefeicao.map((label) => (
               <Chip
@@ -205,7 +212,9 @@ export default function PaymentMethodsPage() {
               />
             ))}
           </Section>
+          )}
 
+          {false && (
           <Section title="Outros">
             {outros.map((label) => (
               <Chip
@@ -216,6 +225,7 @@ export default function PaymentMethodsPage() {
               />
             ))}
           </Section>
+          )
 
           <Section title="Débito">
             {debito.map((label) => (
@@ -240,7 +250,8 @@ export default function PaymentMethodsPage() {
           </Section>
         </div>
 
-        {/* Pagamento por app/site */}
+        {/* Pagamento por app/site (oculto) */}
+        {false && (
         <div className="space-y-6">
           <h2 className="text-2xl font-semibold text-zinc-900">Pagamento por app/site</h2>
           <Section title="Carteira Digital">
@@ -258,8 +269,10 @@ export default function PaymentMethodsPage() {
             })}
           </Section>
         </div>
+        )}
 
-        {/* MySnack Premiação (verde) */}
+        {/* MySnack Premiação (verde) (oculta) */}
+        {false && (
         <section className="rounded-2xl border bg-white p-6">
           <h3 className="text-xl font-semibold text-zinc-900">MySnack Premiação</h3>
           <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

@@ -17,6 +17,9 @@ export type EnrichedOrder = {
   userPhone?: string | null;
   userCity?: string | null;
   userState?: string | null;
+  deliveryMode?: string | null;
+  address?: any;
+  cancelReason?: string | null;
   storeId?: string | null;
   number?: string | null;
   total?: number | null;

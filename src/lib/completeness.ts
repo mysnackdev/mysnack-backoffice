@@ -5,7 +5,7 @@ import { db } from "@/firebase";
 export type CompletenessResult = { complete: boolean; missing: string[] };
 
 /** --------- Tipos mínimos usados nas validações --------- */
-type StoreProfileData = {
+type StoreProfileData = { shoppingSlug?: string;
   nome?: string;
   displayName?: string;
   storeName?: string;

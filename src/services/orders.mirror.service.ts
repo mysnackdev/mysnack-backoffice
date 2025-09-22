@@ -12,6 +12,7 @@ export type StoreMirrorOrder = {
   total?: number | null;
   number?: string | null;
   itemsCount?: number | null;
+  statusChangedAt?: number | null;
   storeId?: string | null;
   lastItem?: string | null;
 };
@@ -28,6 +29,7 @@ type StoreMirrorOrderRaw = {
   number?: string | null;
   items?: unknown[] | null;
   itemsCount?: number | null;
+  statusChangedAt?: number | null;
   storeId?: string | null;
   lastItem?: string | null;
 };
@@ -81,6 +83,7 @@ export function subscribeAllOrders(cb: (orders: StoreMirrorOrder[]) => void): ()
           ? val.itemsCount
           : null,
         storeId: val?.storeId ?? null,
+        statusChangedAt: typeof val?.statusChangedAt === 'number' ? val.statusChangedAt : null,
       }))
       .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     cb(list);
