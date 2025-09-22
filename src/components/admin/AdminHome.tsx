@@ -7,15 +7,18 @@ import {
   getStoresStatusCF,
   listShoppingsCF,
   createShoppingCF,
-  updateShoppingCF,
+  
   approveStoreInShoppingCF,
   suspendStoreInShoppingCF,
   type StoreSummary,
   type Shop
 } from "@/services/admin.service";
 
+type BackofficeStoreMeta = { shoppingSlug?: string; approved?: boolean; suspended?: boolean };
+type AdminStore = StoreSummary & BackofficeStoreMeta;
+
 export default function AdminHome() {
-  const [stores, setStores] = React.useState<StoreSummary[]>([]);
+  const [stores, setStores] = React.useState<AdminStore[]>([]);
   const [shoppings, setShoppings] = React.useState<Shop[]>([]);
   const [selectedShop, setSelectedShop] = React.useState<string | "all">("all");
   const [storeQuery, setStoreQuery] = React.useState<string>("");
@@ -31,8 +34,8 @@ export default function AdminHome() {
 
         try {
           const snap = await get(ref(db, 'backoffice/stores'));
-          const base = (snap.val() || {}) as Record<string, any>;
-          const merged = (s.stores || []).map((it: any) => ({
+          const base = (snap.val() || {}) as Record<string, BackofficeStoreMeta>;
+          const merged = (s.stores || []).map((it: StoreSummary) => ({
             ...it,
             shoppingSlug: base[it.id]?.shoppingSlug ?? it.shoppingSlug,
             approved: base[it.id]?.approved ?? it.approved,
@@ -46,9 +49,9 @@ export default function AdminHome() {
         try {
           const storesRef = ref(db, 'backoffice/stores');
           onValue(storesRef, (snap2) => {
-            const base2 = (snap2.val() || {}) as Record<string, any>;
+            const base2 = (snap2.val() || {}) as Record<string, BackofficeStoreMeta>;
             setStores((prev) =>
-              prev.map((it: any) => ({
+              prev.map((it: StoreSummary) => ({
                 ...it,
                 shoppingSlug: base2[it.id]?.shoppingSlug ?? it.shoppingSlug,
                 approved: base2[it.id]?.approved ?? it.approved,
@@ -65,7 +68,7 @@ export default function AdminHome() {
     }, []);
 
   const filteredStores = stores
-    .filter((s) => (selectedShop === "all" ? true : (s as any).shoppingSlug === selectedShop))
+    .filter((s) => (selectedShop === "all" ? true : s.shoppingSlug === selectedShop))
     .filter((s) => (!storeQuery ? true : (s.name || "").toLowerCase().includes(storeQuery.toLowerCase())));
 
   const onCreateShop = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -95,7 +98,7 @@ export default function AdminHome() {
             <label className="text-muted-foreground">Filtrar por shopping:</label>
             <select
               value={selectedShop}
-              onChange={(e) => setSelectedShop(e.target.value as any)}
+              onChange={(e) => setSelectedShop(e.target.value as string)}
               className="border rounded-lg px-2 py-1"
             >
               <option value="all">Todos</option>
@@ -124,16 +127,16 @@ export default function AdminHome() {
               <div>
                 <div className="font-medium flex items-center gap-2">
                   {s.name}
-                  {(s as any).shoppingSlug ? (
+                  {s.shoppingSlug ? (
                     <span className="text-[10px] px-2 py-0.5 rounded-full border">
-                      {(s as any).shoppingSlug}
+                      {s.shoppingSlug}
                     </span>
                   ) : null}
-                  {(s as any).suspended ? (
+                  {s.suspended ? (
                     <span className="text-[10px] px-2 py-0.5 rounded-full border border-red-300 bg-red-50 text-red-700">
                       Suspensa
                     </span>
-                  ) : (s as any).approved === false ? (
+                  ) : s.approved === false ? (
                     <span className="text-[10px] px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-700">
                       Pendente
                     </span>
@@ -154,7 +157,7 @@ export default function AdminHome() {
                   <div className="text-xs text-muted-foreground">{s.displayName}</div>
                 ) : null}
               </div>
-              <Link href={`/shopping?slug=${(s as any).shoppingSlug || ""}`} className="underline text-sm">
+              <Link href={`/shopping?slug=${s.shoppingSlug || ""}`} className="underline text-sm">
                 abrir
               </Link>
             </div>
@@ -188,8 +191,8 @@ export default function AdminHome() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
           {shoppings.map((shop) => {
-            const total = stores.filter((s) => (s as any).shoppingSlug === shop.slug).length;
-            const online = stores.filter((s) => (s as any).shoppingSlug === shop.slug && s.online).length;
+            const total = stores.filter((s) => s.shoppingSlug === shop.slug).length;
+            const online = stores.filter((s) => s.shoppingSlug === shop.slug && s.online).length;
                         return (
               <div key={shop.slug} className="border rounded-lg p-3">
                 <div className="flex items-start justify-between gap-3">

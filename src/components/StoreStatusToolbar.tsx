@@ -1,6 +1,7 @@
 // src/components/StoreStatusToolbar.tsx
 "use client";
 
+
 import React, { useEffect, useState } from "react";
 import { ref, onValue, update } from "firebase/database";
 import { db } from "@/firebase";
@@ -8,6 +9,8 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/components/ui/toast";
 
 type Setup = "configurado" | "em_configuracao";
+
+type StoreDoc = { status?: { online?: boolean; cadastroCompleto?: boolean; _setup?: Setup; onlineReason?: string | null }; shoppingSlug?: string | null; approved?: boolean; suspended?: boolean };
 
 function Dot({ on }: { on: boolean }) {
   return (
@@ -35,7 +38,7 @@ export default function StoreStatusToolbar() {
 
   const [online, setOnline] = useState(false);
   const [cadastroCompleto, setCadastroCompleto] = useState(false);
-  const [setup, setSetup] = useState<Setup>("em_configuracao");
+  const [_setup, setSetup] = useState<Setup>("em_configuracao");
   const [shoppingSlug, setShoppingSlug] = useState<string | null>(null);
   const [approved, setApproved] = useState<boolean>(false);
   const [suspended, setSuspended] = useState<boolean>(false);
@@ -45,11 +48,11 @@ export default function StoreStatusToolbar() {
     if (!uid) return;
     const r = ref(db, `backoffice/stores/${uid}`);
     const off = onValue(r, (snap) => {
-      const base = (snap.val() || {}) as any;
+      const base = (snap.val() || {}) as StoreDoc;
       const st = base.status || {};
       setOnline(Boolean(st.online));
       setCadastroCompleto(Boolean(st.cadastroCompleto));
-      setSetup((st.setup as Setup) || "em_configuracao");
+      setSetup((st._setup as Setup) || "em_configuracao");
       setShoppingSlug(base.shoppingSlug || null);
       setApproved(Boolean(base.approved));
       setSuspended(Boolean(base.suspended));

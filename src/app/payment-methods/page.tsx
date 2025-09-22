@@ -17,71 +17,57 @@ type PaymentState = {
 const DEFAULT_STATE: PaymentState = {
   onDelivery: [],
   appSite: [],
-  mysnackAwards: [
-    "Saldo Alimentação + Refeição",
-    "MySnack Pago Pré",
-    "Saldo Comer No MySnack",
-    "MySnack Pago Crédito Consignado",
-    "Limite MySnack Pago",
-    "MySnack Saldo Livre",
-    "MySnack Pago Crédito",
-  ],
+  mysnackAwards: [],
   banking: [],
 };
 
-function Chip({
-  checked,
-  label,
-  onToggle,
-}: {
-  checked: boolean;
-  label: string;
-  onToggle: () => void;
-}) {
+// Chips -------------------------------------------------------------
+function Chip(props: { label: string; checked: boolean; onToggle: () => void }) {
+  const { label, checked, onToggle } = props;
   return (
     <button
       type="button"
       onClick={onToggle}
-      className={
-        "flex items-center justify-between rounded-2xl border px-4 py-3 text-[15px] " +
-        (checked ? "border-rose-300 bg-rose-50" : "border-zinc-200 bg-white hover:bg-zinc-50")
-      }
+      className={[
+        "rounded-full border px-4 py-2 text-sm font-medium transition",
+        checked
+          ? "border-rose-500 bg-rose-50 text-rose-700"
+          : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50",
+      ].join(" ")}
+      aria-pressed={checked}
     >
-      <span className="flex items-center gap-3">
-        <span
-          className={
-            "grid h-5 w-5 place-items-center rounded-full border " +
-            (checked ? "border-rose-600" : "border-zinc-400")
-          }
-        >
-          <span className={"h-2.5 w-2.5 rounded-full " + (checked ? "bg-rose-600" : "bg-transparent")} />
-        </span>
-        {label}
-      </span>
+      {label}
     </button>
   );
 }
 
-function GreenChip({ label }: { label: string }) {
+function GreenChip(props: { label: string }) {
   return (
-    <div className="rounded-2xl bg-emerald-50 text-emerald-700 px-4 py-3 text-[15px] border border-emerald-200 flex items-center gap-2">
-      <span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-600 text-white text-[12px]">✓</span>
-      {label}
-    </div>
+    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+      {props.label}
+    </span>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section(props: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border bg-white p-6">
-      <h3 className="text-xl font-semibold text-zinc-900">{title}</h3>
+      <h3 className="text-xl font-semibold text-zinc-900">{props.title}</h3>
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {children}
+        {props.children}
       </div>
     </section>
   );
 }
 
+// Opções ------------------------------------------------------------
+const onDeliveryOptions = ["Crédito", "Débito", "Vale-refeição", "Outros"];
+const appSiteOptions = ["Carteira Digital"];
+const mysnackAwardsOptions = ["Cupom MySnack", "Cashback", "Selo Fidelidade"];
+const bankingOptions = ["Pix", "Nubank"];
+
+// Página ------------------------------------------------------------
 export default function PaymentMethodsPage() {
   const { user } = useAuth();
   const [saving, setSaving] = React.useState(false);
@@ -96,71 +82,37 @@ export default function PaymentMethodsPage() {
       const v = snap.val() as Partial<PaymentState>;
       setState((s) => ({
         ...s,
-        onDelivery: v.onDelivery ?? s.onDelivery,
-        appSite: v.appSite ?? s.appSite,
-        mysnackAwards: v.mysnackAwards ?? s.mysnackAwards,
-        banking: v.banking ?? s.banking,
+        onDelivery: Array.isArray(v.onDelivery) ? v.onDelivery : s.onDelivery,
+        appSite: Array.isArray(v.appSite) ? v.appSite : s.appSite,
+        mysnackAwards: Array.isArray(v.mysnackAwards) ? v.mysnackAwards : s.mysnackAwards,
+        banking: Array.isArray(v.banking) ? v.banking : s.banking,
       }));
     });
   }, [user]);
 
-  // ✅ evita no-unused-expressions (if/else em vez de operador ternário só com efeito colateral)
-  const toggle = (bucket: keyof PaymentState, label: string) =>
+  function toggle<K extends keyof PaymentState>(key: K, label: string) {
     setState((s) => {
-      const set = new Set(s[bucket]);
-      if (set.has(label)) {
-        set.delete(label);
-      } else {
-        set.add(label);
-      }
-      return { ...s, [bucket]: Array.from(set) } as PaymentState;
+      const has = s[key].includes(label);
+      const next = has ? s[key].filter((x) => x !== label) : [...s[key], label];
+      return { ...s, [key]: next } as PaymentState;
     });
+  }
 
-  const save = async () => {
+  async function save() {
     if (!user) return;
     setSaving(true);
     try {
-      const allowedOnDelivery = state.onDelivery.filter((x) => debito.includes(x) || credito.includes(x));
-      const allowedBanking = state.banking.filter((x) => x === 'Pix');
-      await update(ref(db, `backoffice/tenants/${user.uid}/payments`), {
-        onDelivery: allowedOnDelivery,
-        banking: allowedBanking,
-      });
-      await update(ref(db, `backoffice/tenants/${user.uid}/storeProfile`), {
-        updatedAt: Date.now(),
-      });
+      await update(ref(db, `backoffice/tenants/${user.uid}/payments`), state);
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  // Listas (ajuste conforme quiser)
-  const valeRefeicao = [
-    "Green Card Refeição",
-    "Verocard",
-    "Ben Refeição",
-    "Valecard",
-    "VR Refeição",
-    "Pluxee Refeição (Sodexo Refeição)",
-    "Ticket",
-    "Alelo Refeição",
-    "Nutricard Refeição",
-    "Banricard Refeição",
-  ];
-  const outros = ["Dinheiro", "Cheque"];
-  const debito = ["Visa", "Mastercard", "Elo", "Banricompras"];
-  const credito = ["Nugo", "Hipercard", "Banricompras", "Visa", "Elo", "Good Card", "Amex", "Mastercard"];
-  const carteiraDigital = ["Visa", "Visa Débito", "Visa", "Mastercard", "Elo Débito", "Saldo Da Carteira"];
-  const bankingOptions = ["Pix"]; // ✅ usado abaixo (não dá warning)
-
-  // Sugestão simples para o botão "Aceitar recomendações"
   const acceptRecommendations = () => {
-    // Apenas opções visíveis no momento
-    const recOnDelivery = ["Visa", "Mastercard"];
+    const recOnDelivery = ["Crédito", "Débito"];
     setState((s) => ({
       ...s,
       onDelivery: Array.from(new Set([...s.onDelivery, ...recOnDelivery])),
-      // exemplo: habilitar Pix por padrão
       banking: Array.from(new Set([...s.banking, "Pix"])),
     }));
   };
@@ -172,117 +124,75 @@ export default function PaymentMethodsPage() {
           <h1 className="text-3xl font-bold tracking-tight text-zinc-900">
             Configurações de Forma de Pagamento
           </h1>
-          {/* opcional: mostrar o nome da loja aqui, se você quiser puxar do contexto */}
         </div>
 
+        {/* Destaque com recomendações */}
         <div className="rounded-2xl border bg-gradient-to-br from-zinc-900 to-zinc-800 text-white p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-lg bg-rose-500/20 text-rose-200">⚡️</div>
+              <span className="mt-1 h-3 w-3 rounded-full bg-rose-400" />
               <div>
-                <div className="text-lg font-semibold">Tenha diversas opções de pagamento para vender mais</div>
-                <p className="mt-1 text-sm text-white/80 max-w-3xl">
-                  Recomendamos aceitar dinheiro, vale-refeição, cartões de crédito e débito.
-                  Essas formas de pagamento <b>são utilizadas por 9 em cada 10 clientes</b> da sua região.
-                  Você poderá alterar estes dados depois.
+                <p className="text-base font-medium">
+                  Recomendação MySnack: habilite pagamentos mais populares
+                </p>
+                <p className="text-sm text-white/80">
+                  Ative crédito, débito e Pix para aumentar a conversão.
                 </p>
               </div>
             </div>
             <button
+              type="button"
               onClick={acceptRecommendations}
-              className="rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-medium hover:bg-white/20"
+              className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20"
             >
               Aceitar recomendações
             </button>
           </div>
         </div>
 
-        {/* Pagamento na entrega */}
-        <div className="space-y-6">
-          <h2 className="text-2xl font-semibold text-zinc-900">Pagamento na entrega</h2>
+        {/* Recebendo no balcão/na entrega */}
+        <Section title="Recebendo no balcão/na entrega">
+          {onDeliveryOptions.map((label) => (
+            <Chip
+              key={label}
+              label={label}
+              checked={state.onDelivery.includes(label)}
+              onToggle={() => toggle("onDelivery", label)}
+            />
+          ))}
+        </Section>
 
-          {false && (
-          <Section title="Vale-refeição">
-            {valeRefeicao.map((label) => (
-              <Chip
-                key={label}
-                label={label}
-                checked={state.onDelivery.includes(label)}
-                onToggle={() => toggle("onDelivery", label)}
-              />
-            ))}
-          </Section>
-          )}
-
-          {false && (
-          <Section title="Outros">
-            {outros.map((label) => (
-              <Chip
-                key={label}
-                label={label}
-                checked={state.onDelivery.includes(label)}
-                onToggle={() => toggle("onDelivery", label)}
-              />
-            ))}
-          </Section>
-          )
-
-          <Section title="Débito">
-            {debito.map((label) => (
-              <Chip
-                key={label}
-                label={label}
-                checked={state.onDelivery.includes(label)}
-                onToggle={() => toggle("onDelivery", label)}
-              />
-            ))}
-          </Section>
-
-          <Section title="Crédito">
-            {credito.map((label) => (
-              <Chip
-                key={label}
-                label={label}
-                checked={state.onDelivery.includes(label)}
-                onToggle={() => toggle("onDelivery", label)}
-              />
-            ))}
-          </Section>
-        </div>
-
-        {/* Pagamento por app/site (oculto) */}
+        {/* Pagamento por app/site (opcional/oculto com markup válido) */}
         {false && (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-semibold text-zinc-900">Pagamento por app/site</h2>
-          <Section title="Carteira Digital">
-            {carteiraDigital.map((label, i) => {
-              // Mantém identificadores únicos para rótulos repetidos
-              const id = `${label}#${i}`;
-              return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-zinc-900">Pagamento por app/site</h2>
+            <Section title="Carteira Digital">
+              {/* itens de Carteira Digital ocultos */}
+              {appSiteOptions.map((label) => (
                 <Chip
-                  key={id}
+                  key={label}
                   label={label}
-                  checked={state.appSite.includes(id)}
-                  onToggle={() => toggle("appSite", id)}
+                  checked={state.appSite.includes(label)}
+                  onToggle={() => toggle("appSite", label)}
                 />
-              );
-            })}
-          </Section>
-        </div>
+              ))}
+            </Section>
+          </div>
         )}
 
         {/* MySnack Premiação (verde) (oculta) */}
         {false && (
-        <section className="rounded-2xl border bg-white p-6">
-          <h3 className="text-xl font-semibold text-zinc-900">MySnack Premiação</h3>
-          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {state.mysnackAwards.map((label) => (
-              <GreenChip key={label} label={label} />
-            ))}
-          </div>
-        </section>
+          <section className="rounded-2xl border bg-white p-6">
+            <h3 className="text-xl font-semibold text-zinc-900">MySnack Premiação</h3>
+            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {mysnackAwardsOptions.map((label) => (
+                <GreenChip key={label} label={label} />
+              ))}
+            </div>
+          </section>
+        )}
 
-        {/* Pix / Nubank */}
+        {/* Bancos / Pix */}
         <section className="rounded-2xl border bg-white p-6">
           <h3 className="text-xl font-semibold text-zinc-900">Bancos & Pix</h3>
           <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

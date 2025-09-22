@@ -2,15 +2,16 @@
 "use client";
 
 import React from "react";
-import { get, onValue, ref, update } from "firebase/database";
+import {  onValue, ref, update } from "firebase/database";
 import { db } from "@/firebase";
 import DashboardShell from "@/components/DashboardShell";
 import StoreStatusToolbar from "@/components/StoreStatusToolbar";
 import OperatorsCard from "@/components/store/OperatorsCard";
 import { Toaster, toast } from "@/components/ui/toast";
 import { useAuth } from "@/context/AuthContext";
-import { evaluateCompleteness, syncSetupStatus } from "@/lib/completeness";
+import {  syncSetupStatus } from "@/lib/completeness";
 import { listShoppingsCF, linkStoreToShoppingCF } from "@/services/admin.service";
+import type { Shop } from "@/services/admin.service";
 
 type StoreProfile = {
   nome?: string;
@@ -25,25 +26,13 @@ type StoreProfile = {
   rating?: number;
   deliveryEta?: string;
 };
+// (unused) type Setup = 
 
-type Setup = "configurado" | "em_configuracao";
 
 function formatCNPJ(v?: string) {
   const digits = String(v || "").replace(/\D+/g, "").slice(0, 14);
   if (digits.length !== 14) return v || "—";
   return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
-}
-
-function formatBR(ts?: number | null) {
-  if (!ts) return "";
-  const d = new Date(ts);
-  return d.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function useDebounced(value: string, delay = 250) {
@@ -57,8 +46,7 @@ function useDebounced(value: string, delay = 250) {
 
 function AutocompleteShopping({
   value,
-  onSelect,
-}: {
+  onSelect }: {
   value?: string | null;
   onSelect: (slug: string) => void;
 }) {
@@ -70,7 +58,7 @@ function AutocompleteShopping({
     let active = true;
     (async () => {
       const { shoppings } = await listShoppingsCF();
-      const list = (shoppings || []).map((s: any) => ({ slug: s.slug, name: s.name }));
+      const list = (shoppings || []).map((s: Shop) => ({ slug: s.slug, name: s.name }));
       const filtered = list.filter(
         (s) =>
           !debounced ||
@@ -130,8 +118,7 @@ export default function MinhaLojaPage() {
     cnpj: "",
     razaoSocial: "",
     rating: undefined,
-    deliveryEta: "",
-  });
+    deliveryEta: "" });
 
   const [shoppingSlug, setShoppingSlug] = React.useState<string | null>(null);
 
@@ -157,7 +144,7 @@ export default function MinhaLojaPage() {
 
   function handleChange<K extends keyof StoreProfile>(key: K) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      const v: any = e.target.type === "number" ? Number(e.target.value) : e.target.value;
+      const v: string | number = e.target.type === "number" ? Number(e.target.value) : e.target.value;
       setForm((p) => ({ ...p, [key]: v }));
     };
   }
@@ -165,7 +152,7 @@ export default function MinhaLojaPage() {
   async function handleBlur<K extends keyof StoreProfile>(key: K) {
     const rProfile = ref(db, `backoffice/tenants/${uid}/storeProfile/${String(key)}`);
     await update(rProfile, { ".": 0 }).catch(() => {}); // noop to ensure path
-    await update(ref(db, `backoffice/tenants/${uid}/storeProfile`), { [String(key)]: (form as any)[key] });
+    await update(ref(db, `backoffice/tenants/${uid}/storeProfile`), { [String(key)]: form[key] as unknown });
     await syncSetupStatus(uid);
   }
 
@@ -383,8 +370,8 @@ return (
               await linkStoreToShoppingCF({ storeId: uid, shoppingSlug: slug });
               await syncSetupStatus(uid);
               toast.success(`Shopping vinculado: ${slug}`);
-            } catch (e: any) {
-              toast.error(`Erro ao vincular: ${String(e?.message || e)}`);
+            } catch (e: unknown) {
+              toast.error(`Erro ao vincular: ${(e instanceof Error) ? e.message : String(e)}`);
             }
           }}
         />

@@ -1,65 +1,60 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { fetchMyStoreOrdersEnriched, type EnrichedOrder } from "@/services/orders.enriched.service";
-import { useAuth } from "@/context/AuthContext";
+
+import React from "react";
 import { subscribeOrdersByStore, type StoreMirrorOrder } from "@/services/orders.mirror.service";
-import StatusBadgeWithActions from "@/components/StatusBadgeWithActions";
 import { useMyStoreId } from "@/hooks/useMyStoreId";
+import StatusBadgeWithActions from "@/components/StatusBadgeWithActions";
 import { ref, get } from "firebase/database";
 import { db } from "@/firebase";
+import type { EnrichedOrder } from "@/services/orders.enriched.service";
 
-function formatDate(ts: number) {
-  try { return new Date(ts).toLocaleString("pt-BR"); } catch { return ""; }
-}
-function cents(v: number | undefined | null) {
-  if (typeof v !== "number") return "";
-  try { return (v / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); } catch { return ""; }
-}
+type ExtendedOrder = EnrichedOrder & { [key: string]: unknown };
+type OrderItem = { name?: string; label?: string; qty?: number; price?: number; options?: Array<{ name?: string; label?: string } | string> };
 
-
-function AddressSnippet({ o }: { o: any }) {
-  const addr = o.address || o.shippingAddress || o.delivery?.address || {};
-  const mode = o.deliveryMode || o.mode || o.fulfillment?.mode || (o.pickup ? "pickup" : (addr && Object.keys(addr).length ? "delivery" : null));
-  if (mode === "pickup") {
-    return <div className="text-xs text-zinc-600">Retirada no balcão</div>;
-  }
-  const line1 = [addr.street || addr.logradouro || addr.line1, addr.number || addr.numero].filter(Boolean).join(", ");
-  const line2 = [addr.neighborhood || addr.bairro, (addr.city || o.userCity), (addr.state || o.userState)].filter(Boolean).join(" - ");
-  const zip = addr.cep || addr.zip || addr.postalCode;
-  const complement = addr.complement || addr.complemento || addr.line2;
+function AddressSnippet({ o }: { o: ExtendedOrder }) {
+  const r = o as Record<string, unknown>;
+  const addr: Record<string, unknown> =
+    (r["address"] as Record<string, unknown> | undefined) ||
+    (r["shippingAddress"] as Record<string, unknown> | undefined) ||
+    ((r["delivery"] as Record<string, unknown> | undefined)?.["address"] as Record<string, unknown> | undefined) ||
+    {};
+  const line1 = [addr["street"] || addr["logradouro"] || addr["line1"], addr["number"] || addr["numero"]]
+    .filter(Boolean)
+    .join(", ");
+  const line2 = [addr["neighborhood"] || addr["bairro"], (addr["city"] || addr["town"] || addr["municipio"] || r["userCity"]), (addr["state"] || r["userState"])]
+    .filter(Boolean)
+    .join(" - ");
+  const zipVal = (addr["cep"] ?? addr["zip"] ?? addr["postalCode"]) as string | number | undefined;
+  const compVal = (addr["complement"] ?? addr["complemento"] ?? addr["line2"]) as string | undefined;
+  const parts = [zipVal, compVal].filter((v) => v != null && v !== "") as (string | number)[];
+  const extra = parts.map(String).join(" • ");
   return (
     <div className="text-xs text-zinc-600">
-      {line1 && <div>{line1}</div>}
-      {line2 && <div>{line2}</div>}
-      {(zip || complement) && <div className="text-zinc-500">{[zip, complement].filter(Boolean).join(" • ")}</div>}
+      {line1 && <div>{String(line1)}</div>}
+      {line2 && <div>{String(line2)}</div>}
+      {extra && <div className="text-zinc-500">{extra}</div>}
     </div>
   );
 }
-
 
 function ItemsPreview({ items, count }: { items?: string[]; count?: number | null }) {
   const has = Array.isArray(items) && items.length > 0;
   if (!has && !count) return null;
   return (
     <div className="mt-2 text-xs text-zinc-700">
-      {has && (
-        <div className="flex flex-wrap gap-1">
-          {items!.slice(0, 4).map((name, i) => (
-            <span key={i} className="px-2 py-0.5 bg-zinc-100 rounded-full border text-zinc-700">{name}</span>
-          ))}
-        </div>
-      )}
+      {has && <div className="line-clamp-2">{items!.join(", ")}</div>}
       {typeof count === "number" && count > (items?.length || 0) && (
-        <div className="mt-1">+{count - (items?.length || 0)} item(s)</div>
+        <div className="text-zinc-500">+{count - (items?.length || 0)} itens</div>
       )}
     </div>
   );
 }
 
-
-function OrderDrawer({ open, onClose, orderId, fallback }: { open: boolean; onClose: () => void; orderId: string | null; fallback?: any }) {
+function OrderDrawer(
+  { open, onClose, orderId, fallback }: { open: boolean; onClose: () => void; orderId: string | null; fallback?: EnrichedOrder | null }
+) {
   const [loading, setLoading] = React.useState(false);
-  const [data, setData] = React.useState<any>(null);
+  const [data, setData] = React.useState<EnrichedOrder | null>(null);
 
   React.useEffect(() => {
     let mounted = true;
@@ -68,7 +63,7 @@ function OrderDrawer({ open, onClose, orderId, fallback }: { open: boolean; onCl
       setLoading(true);
       try {
         const snap = await get(ref(db, `orders/${orderId}`));
-        if (mounted) setData(snap.exists() ? snap.val() : null);
+        if (mounted) setData(snap.exists() ? (snap.val() as EnrichedOrder) : null);
       } catch {
         if (mounted) setData(null);
       } finally {
@@ -79,24 +74,38 @@ function OrderDrawer({ open, onClose, orderId, fallback }: { open: boolean; onCl
     return () => { mounted = false; };
   }, [open, orderId]);
 
-  const o = data || fallback || {};
-  const items = Array.isArray(o.items) ? o.items : [];
-  const addr = o.address || o.shippingAddress || o.delivery?.address || {};
-  const line1 = [addr.street || addr.logradouro || addr.line1, addr.number || addr.numero].filter(Boolean).join(", ");
-  const line2 = [addr.neighborhood || addr.bairro, (addr.city || o.userCity), (addr.state || o.userState)].filter(Boolean).join(" - ");
-  const zip = addr.cep || addr.zip || addr.postalCode;
-  const complement = addr.complement || addr.complemento || addr.line2;
-  const mode = o.deliveryMode || o.mode || o.fulfillment?.mode || (o.pickup ? "pickup" : (addr && Object.keys(addr).length ? "delivery" : null));
-  const note = o.note || o.obs || o.observation || o.comments;
+  const o = (data || fallback || {}) as ExtendedOrder;
+  const items = Array.isArray((o as Record<string, unknown>)["items"])
+    ? ((o as unknown as { items: OrderItem[] }).items)
+    : [];
+
+  const r = o as Record<string, unknown>;
+  const addr: Record<string, unknown> =
+    (r["address"] as Record<string, unknown> | undefined) ||
+    (r["shippingAddress"] as Record<string, unknown> | undefined) ||
+    ((r["delivery"] as Record<string, unknown> | undefined)?.["address"] as Record<string, unknown> | undefined) ||
+    {};
+
+  const mode: string | null =
+    (r["deliveryMode"] as string | undefined) ||
+    (r["mode"] as string | undefined) ||
+    ((r["fulfillment"] as Record<string, unknown> | undefined)?.["mode"] as string | undefined) ||
+    ((r["pickup"] ? "pickup" : (Object.keys(addr).length ? "delivery" : null)) as string | null);
+
+  const note =
+    (r["note"] as string | undefined) ||
+    (r["obs"] as string | undefined) ||
+    (r["observation"] as string | undefined) ||
+    (r["comments"] as string | undefined);
 
   return (
     <div className={`fixed inset-0 z-50 transition ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
       {/* backdrop */}
       <div className={`absolute inset-0 bg-black/30 transition-opacity ${open ? "opacity-100" : "opacity-0"}`} onClick={onClose} />
       {/* panel */}
-      <aside className={`absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl transition-transform ${open ? "translate-x-0" : "translate-x-full"}`}>
-        <div className="p-4 border-b flex items-center justify-between">
-          <div className="font-semibold">Pedido #{(orderId||"").slice(0,5)}</div>
+      <div className={`absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-xl transition-transform ${open ? "translate-x-0" : "translate-x-full"}`}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="font-semibold">Pedido #{(orderId || "").slice(0, 5)}</div>
           <button onClick={onClose} className="text-sm px-3 py-1 rounded-md border">Fechar</button>
         </div>
         <div className="p-4 space-y-4 overflow-y-auto h-full">
@@ -106,60 +115,49 @@ function OrderDrawer({ open, onClose, orderId, fallback }: { open: boolean; onCl
           <section>
             <div className="text-xs font-semibold mb-1">Cliente</div>
             <div className="text-sm">
-              {o.userName && <div>{o.userName}</div>}
-              {o.userEmail && <div className="text-zinc-500">{o.userEmail}</div>}
-              {o.userPhone && <div className="text-zinc-500">{o.userPhone}</div>}
-                <AddressSnippet o={o} />
+              {(r["userName"] as string | undefined) && <div>{r["userName"] as string}</div>}
+              {(r["userEmail"] as string | undefined) && <div className="text-zinc-500">{r["userEmail"] as string}</div>}
+              {(r["userPhone"] as string | undefined) && <div className="text-zinc-500">{r["userPhone"] as string}</div>}
+              <AddressSnippet o={o} />
             </div>
           </section>
 
           {/* Entrega/Retirada */}
           <section>
             <div className="text-xs font-semibold mb-1">Entrega/Retirada</div>
-            <div className="text-sm text-zinc-700">
-              {mode === "pickup" ? (
-                <div>Retirada no balcão</div>
-              ) : (
-                <div className="space-y-0.5">
-                  {line1 && <div>{line1}</div>}
-                  {line2 && <div>{line2}</div>}
-                  {(zip || complement) && <div className="text-zinc-500">{[zip, complement].filter(Boolean).join(" • ")}</div>}
-                </div>
-              )}
+            <div className="text-sm">
+              {mode === "pickup" ? "Retirada no balcão" : "Entrega"}
             </div>
           </section>
 
           {/* Itens */}
           <section>
             <div className="text-xs font-semibold mb-1">Itens</div>
+            <ItemsPreview items={items.map((it) => (typeof it.name === "string" ? it.name : (it as unknown as { id?: string }).id || ""))} count={items.length} />
             <ul className="divide-y border rounded-lg">
               {items.length === 0 && <li className="p-3 text-sm text-zinc-500">Sem itens disponíveis.</li>}
-              {items.map((it:any, i:number) => {
-                const name = it.name || it.id || `Item ${i+1}`;
-                const qty = it.qty || it.quantity || 1;
-                const unit = Number(it.price || it.unitPrice || 0);
-                const total = Number(it.subtotal || (unit * qty));
-                const opts = Array.isArray(it.options) ? it.options : (Array.isArray(it.modifiers) ? it.modifiers : []);
-                const noteIt = it.note || it.obs || it.observation;
+              {items.map((it: OrderItem, i: number) => {
+                const altQty = (it as unknown as { quantity?: number }).quantity;
+                const qty = typeof it.qty === "number" ? it.qty : (typeof altQty === "number" ? altQty : 1);
+                const name = it.name || (it as unknown as { id?: string }).id || `Item ${i + 1}`;
+                const opts = Array.isArray(it.options) ? it.options : [];
                 return (
-                  <li key={i} className="p-3 text-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium">{qty}× {name}</div>
-                      <div>{(total/100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div>
+                  <li key={i} className="p-3 space-y-1">
+                    <div className="flex justify-between">
+                      <div className="font-medium">{qty}x {name}</div>
                     </div>
-                    {opts && opts.length > 0 && (
-                      <ul className="mt-1 text-xs text-zinc-600 list-disc pl-4">
-                        {opts.map((op:any, j:number) => <li key={j}>{op.name || op.label || String(op)}</li>)}
-                      </ul>
+                    {opts.length > 0 && (
+                      <div className="text-xs text-zinc-600">
+                        {opts.map((op) => (typeof op === "string" ? op : (op?.label || op?.name || ""))).filter(Boolean).join(", ")}
+                      </div>
                     )}
-                    {noteIt && <div className="mt-1 text-xs text-zinc-700">Obs: {noteIt}</div>}
                   </li>
                 );
               })}
             </ul>
           </section>
 
-          {/* Observações do pedido */}
+          {/* Observações */}
           {note && (
             <section>
               <div className="text-xs font-semibold mb-1">Observações</div>
@@ -167,230 +165,96 @@ function OrderDrawer({ open, onClose, orderId, fallback }: { open: boolean; onCl
             </section>
           )}
         </div>
-      </aside>
+      </div>
     </div>
   );
 }
 
-
-export default function OrdersGrid() {
-  const { role } = useAuth();
-  const storeId = useMyStoreId();
-  const [orders, setOrders] = useState<EnrichedOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statusSince, setStatusSince] = useState<Record<string, { status: string; since: number }>>({});
-  const [cancelAtStepMap, setCancelAtStepMap] = useState<Record<string, string>>({});
-  const [nowTick, setNowTick] = useState(Date.now());
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerOrderId, setDrawerOrderId] = useState<string | null>(null);
-
-
-  // Initial fetch
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const list = await fetchMyStoreOrdersEnriched(storeId || undefined);
-        if (mounted) setOrders(list);
-        if (mounted) {
-          const map = Object.fromEntries(list.map((o: any) => [o.id, { status: o.status, since: (o as any).statusChangedAt || o.createdAt }]));
-          setStatusSince(map);
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
-  }, [role, storeId]);
-
-  // Tick a cada 20s para re-render sem refresh
-  useEffect(() => {
-    const t = setInterval(() => setNowTick(Date.now()), 20000);
-    return () => clearInterval(t);
-  }, []);
-
-  // Realtime subscription
-  useEffect(() => {
-    if (!storeId) return;
-    const unsubscribe = subscribeOrdersByStore(storeId, (mirror: StoreMirrorOrder[]) => {
-      let needsEnrich = false;
-      setOrders((prev) => {
-        const byId = new Map<string, any>(prev.map((o: any) => [o.id, o]));
-        const nextStatusSince: Record<string, { status: string; since: number }> = { ...statusSince };
-        const nextCancelAt: Record<string, string> = { ...cancelAtStepMap };
-
-        mirror.forEach((m) => {
-          const existing: any = byId.get(m.key);
-          if (existing) {
-            if (m.status === "pedido cancelado" && existing.status !== "pedido cancelado") {
-              nextCancelAt[m.key] = existing.status as string;
-            }
-            if (!nextStatusSince[m.key] || nextStatusSince[m.key].status !== m.status) {
-              nextStatusSince[m.key] = { status: m.status, since: m.statusChangedAt || Date.now() };
-            }
-            byId.set(m.key, { ...existing, status: m.status, total: m.total ?? existing.total, statusChangedAt: m.statusChangedAt ?? (existing as any)?.statusChangedAt });
-          } else {
-            needsEnrich = true;
-            byId.set(m.key, {
-              id: m.key,
-              createdAt: m.createdAt,
-              status: m.status,
-              itemsCount: m.itemsCount ?? null,
-              lastItem: m.lastItem ?? null,
-              itemsPreview: [],
-              userId: m.userId ?? null,
-              userName: m.userName ?? null,
-              userEmail: null,
-              userPhone: null,
-              userCity: null,
-              userState: null,
-              storeId: m.storeId ?? storeId,
-              number: m.number ?? null,
-              total: m.total ?? null,
-              statusChangedAt: m.statusChangedAt ?? Date.now(),
-            });
-          }
-        });
-
-        const out = Array.from(byId.values()).sort((a: any,b: any) => (b.createdAt||0)-(a.createdAt||0));
-        if (!needsEnrich) {
-          needsEnrich = out.some((o: any) => !o.itemsPreview || !o.itemsPreview.length || !o.userName);
-        }
-        // side maps
-        setStatusSince(nextStatusSince);
-        setCancelAtStepMap(nextCancelAt);
-
-        // kick async enrichment if needed
-        if (needsEnrich) {
-          fetchMyStoreOrdersEnriched(storeId).then((enriched) => {
-            setOrders((prev2) => {
-              const byId2 = new Map(prev2.map((o:any)=>[o.id,o]));
-              enriched.forEach((e) => {
-                const cur:any = byId2.get(e.id);
-                if (cur) {
-                  byId2.set(e.id, { ...e, status: cur.status ?? e.status, statusChangedAt: (cur as any).statusChangedAt ?? (e as any).statusChangedAt });
-                }
-              });
-              return Array.from(byId2.values()).sort((a: any,b: any) => (b.createdAt||0)-(a.createdAt||0));
-            });
-          }).catch(()=>{});
-        }
-
-        return out;
-      });
-    });
-    return () => { try { unsubscribe && unsubscribe(); } catch {} };
-  }, [storeId, statusSince, cancelAtStepMap]);
-
-  if (loading) {
-    return <div className="p-6 text-sm text-zinc-600">Carregando pedidos…</div>;
+function formatBRL(v?: number | null) {
+  if (typeof v !== "number") return "R$ 0,00";
+  try {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v / 100);
+  } catch {
+    return `R$ ${(v/100).toFixed(2)}`.replace(".", ",");
   }
-  if (!orders.length) {
-    return (
-      <div className="p-6 text-sm text-zinc-600">
-        Nenhum pedido encontrado.
-      </div>
-    );
-  }
-
-  
-  // Highlights 15 min
-  const now = Date.now();
-  const HIGHLIGHT_MS = 15 * 60 * 1000;
-  const highlightIds = new Set(
-    orders
-      .filter((o: any) => {
-        const rec = statusSince[o.id];
-        const since = rec?.since ?? (o as any).statusChangedAt ?? (o as any).createdAt ?? 0;
-        const canceled = (o.status || "").toLowerCase() === "pedido cancelado";
-        const delivered = (o.status || "").toLowerCase() === "pedido entregue";
-        if (canceled || delivered) return false;
-        return now - Number(since || 0) >= HIGHLIGHT_MS;
-      })
-      .map((o: any) => o.id)
-  );
-return (
-    <div className="space-y-6">
-      {/* Pedidos com atenção (+15 min) */}
-      {orders.filter(o => highlightIds.has(o.id)).length > 0 && (
-        <section className="mb-6">
-          <div className="text-sm font-semibold mb-2">Pedidos em atenção (+15 min)</div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {orders.filter(o => highlightIds.has(o.id)).map((o: any) => (
-              <article key={o.id} className="rounded-xl border p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-semibold">Pedido #{(o.id || '').slice(0,5)}</div>
-                    <div className="text-xs text-zinc-500">Criado: {formatDate(o.createdAt || 0)}</div>
-                  </div>
-                  <div>
-                    <button onClick={(e)=>{e.stopPropagation?.(); setDrawerOrderId(o.id); setDrawerOpen(true);}} className="text-xs px-3 py-1 rounded-md border">Ver detalhes</button>
-                  </div>
-                </div>
-            
-                <div className="mt-1 text-xs text-zinc-700">
-                  {o.userName && <div><span className="font-medium">Cliente:</span> {o.userName}</div>}
-                  {o.userEmail && <div className="text-zinc-500">{o.userEmail}</div>}
-                  {o.userPhone && <div className="text-zinc-500">{o.userPhone}</div>}
-                <AddressSnippet o={o} />
-                </div>
-                <div className="mt-2">
-                  <StatusBadgeWithActions
-                    status={o.status}
-                    orderId={o.id}
-                    className="mt-2"
-                    cancelReason={(o as any).cancelReason ?? null}
-                    cancelAtStep={cancelAtStepMap[o.id] ?? null}
-                  />
-                </div>
-                <ItemsPreview items={o.itemsPreview} count={o.itemsCount as any} />
-                <div className="mt-2 text-sm text-zinc-700">
-                  {typeof (o as any).total === 'number' && <div><span className="font-medium">Total:</span> {cents((o as any).total)}</div>}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Pedidos dentro do tempo */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {orders.filter(o => !highlightIds.has(o.id)).map((o: any) => (
-          <article key={o.id} className="rounded-xl border p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="font-semibold">Pedido #{(o.id || '').slice(0,5)}</div>
-                <div className="text-xs text-zinc-500">Criado: {formatDate(o.createdAt || 0)}</div>
-              </div>
-            </div>
-            <div>
-              <button onClick={(e)=>{e.stopPropagation?.(); setDrawerOrderId(o.id); setDrawerOpen(true);}} className="text-xs px-3 py-1 rounded-md border">Ver detalhes</button>
-            </div>
-            <div className="mt-1 text-xs text-zinc-700">
-              {o.userName && <div><span className="font-medium">Cliente:</span> {o.userName}</div>}
-              {o.userEmail && <div className="text-zinc-500">{o.userEmail}</div>}
-              {o.userPhone && <div className="text-zinc-500">{o.userPhone}</div>}
-                <AddressSnippet o={o} />
-            </div>
-            <div className="mt-2">
-              <StatusBadgeWithActions
-                status={o.status}
-                orderId={o.id}
-                className="mt-2"
-                cancelReason={(o as any).cancelReason ?? null}
-                cancelAtStep={cancelAtStepMap[o.id] ?? null}
-              />
-            </div>
-            <ItemsPreview items={o.itemsPreview} count={o.itemsCount as any} />
-            <div className="mt-2 text-sm text-zinc-700">
-              {typeof (o as any).total === 'number' && <div><span className="font-medium">Total:</span> {cents((o as any).total)}</div>}
-            </div>
-          </article>
-        ))}
-      </div>
-    <OrderDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} orderId={drawerOrderId} fallback={orders.find(x=>x.id===drawerOrderId)} />
-  </div>
-  );
 }
 
+export default function OrdersGrid() {
+  const storeId = useMyStoreId();
+  const [orders, setOrders] = React.useState<StoreMirrorOrder[]>([]);
+  const [drawerId, setDrawerId] = React.useState<string | null>(null);
+  const [drawerFallback, setDrawerFallback] = React.useState<EnrichedOrder | null>(null);
 
+  React.useEffect(() => {
+    if (!storeId) return;
+    const unsub = subscribeOrdersByStore(storeId, (list) => {
+      // ordenar do mais recente para o mais antigo
+      setOrders([...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+    });
+    return () => { if (typeof unsub === "function") unsub(); };
+  }, [storeId]);
+
+  if (!storeId) {
+    return <div className="text-sm text-zinc-500">Carregando loja…</div>;
+  }
+
+  const openDrawer = (o: StoreMirrorOrder) => {
+    setDrawerId(o.key);
+    // fallback com dados mínimos
+    setDrawerFallback({
+      id: o.key,
+      createdAt: o.createdAt,
+      status: o.status,
+      itemsCount: o.itemsCount ?? null,
+      lastItem: null,
+      itemsPreview: [],
+      userId: o.userId,
+      userName: undefined,
+      userEmail: undefined,
+      userPhone: undefined,
+      address: undefined,
+      cancelReason: undefined,
+      storeId: o.storeId,
+      number: o.number ?? null,
+      total: o.total ?? null,
+    });
+  };
+
+  return (
+    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+      {orders.map((o) => (
+        <div key={o.key} className="rounded-xl border p-4 bg-white">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="font-semibold">Pedido #_{o.key.slice(0, 3)}_{o.key.slice(-2)}</div>
+              <div className="text-xs text-muted-foreground">
+                Criado: {o.createdAt ? new Date(o.createdAt).toLocaleString("pt-BR") : "-"}
+              </div>
+            </div>
+            <button className="text-xs rounded-lg border px-3 py-1" onClick={() => openDrawer(o)}>
+              Ver detalhes
+            </button>
+          </div>
+
+          <div className="mt-3 text-sm">
+            <div className="text-xs text-muted-foreground">Cliente</div>
+            <div>{/* nome/email/telefone podem estar apenas no pedido completo (drawer) */}</div>
+          </div>
+
+          <div className="mt-3">
+            <StatusBadgeWithActions status={o.status} orderId={o.key} />
+          </div>
+
+          <div className="mt-3 text-sm text-zinc-700">
+            <div className="flex items-center gap-2">
+              <span className="text-xs rounded-full border px-2 py-0.5">itens: {o.itemsCount ?? "–"}</span>
+            </div>
+            <div className="mt-2 font-medium">Total: {formatBRL(o.total)}</div>
+          </div>
+        </div>
+      ))}
+
+      <OrderDrawer open={drawerId != null} onClose={() => setDrawerId(null)} orderId={drawerId} fallback={drawerFallback} />
+    </div>
+  );
+}

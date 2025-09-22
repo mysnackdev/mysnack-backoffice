@@ -4,6 +4,8 @@ import { functions } from "../../firebase";
 type ListReq = { storeId?: string; limit?: number };
 type ListRes = { orders?: EnrichedOrder[]; storeId?: string };
 
+export type Address = { street?: string; logradouro?: string; line1?: string; number?: string | number; numero?: string | number; complement?: string; complemento?: string; line2?: string; neighborhood?: string; bairro?: string; city?: string; state?: string; zip?: string; postalCode?: string; cep?: string; [key: string]: unknown };
+
 export type EnrichedOrder = {
   id: string;
   createdAt: number;
@@ -18,7 +20,7 @@ export type EnrichedOrder = {
   userCity?: string | null;
   userState?: string | null;
   deliveryMode?: string | null;
-  address?: any;
+  address?: Address | null;
   cancelReason?: string | null;
   storeId?: string | null;
   number?: string | null;

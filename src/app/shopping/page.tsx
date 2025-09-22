@@ -1,5 +1,6 @@
-// src/app/shopping/page.tsx
 "use client";
+import type { Shop } from "@/services/admin.service";
+// src/app/shopping/page.tsx
 
 import React from "react";
 import Link from "next/link";
@@ -12,9 +13,9 @@ import {
   approveStoreInShoppingCF,
   suspendStoreInShoppingCF,
   getShoppingCF,
-  saveShoppingCF,
-  rateShoppingCF,
-  addChairCF,
+  updateShoppingCF,
+  submitShoppingLikertCF,
+  upsertChairCF,
   deleteChairCF,
   type StoreSummary,
 } from "@/services/admin.service";
@@ -37,11 +38,11 @@ export default function ShoppingPage() {
   React.useEffect(() => {
     (async () => {
       const s = await getStoresStatusCF();
-      const ss = (s.stores || []).filter((x: any) => (x as any).shoppingSlug === slug);
+      const ss = (s.stores || []).filter((x: StoreSummary) => x.shoppingSlug === slug);
       setStores(ss);
 
       const { shoppings } = await listShoppingsCF();
-      const shop = (shoppings || []).find((it: any) => it.slug === slug);
+      const shop = ((shoppings || []) as Shop[]).find((it) => it.slug === slug);
       if (shop) {
         setTitle(shop.name || shop.slug);
         setAddress(shop.address || "");
@@ -55,12 +56,17 @@ export default function ShoppingPage() {
           if (full.address != null) setAddress(full.address || "");
           if (full.lat != null) setLat(String(full.lat ?? ""));
           if (full.lng != null) setLng(String(full.lng ?? ""));
-          setChairs((full.chairs as any) || []);
-          setAvg(full.rating?.avg ?? undefined);
-          setVotes(full.rating?.votes ?? undefined);
-          const ids = Array.isArray((full as any).stores) ? (full as any).stores as string[] : ((full && (full as any).stores) ? Object.keys((full as any).stores) : []);
+          setChairs(((full as { chairs?: { id: string; label: string; capacity?: number }[] }).chairs || []));
+const rating = (full as { rating?: { avg?: number; votes?: number } }).rating;
+          setAvg(rating?.avg ?? undefined);
+          setVotes(rating?.votes ?? undefined);
+          const ids = Array.isArray((full as { stores?: Record<string, unknown> | string[] }).stores)
+  ? ((full as { stores?: Record<string, unknown> | string[] }).stores as string[])
+  : (((full as { stores?: Record<string, unknown> | string[] }).stores)
+      ? Object.keys((full as { stores?: Record<string, unknown> | string[] }).stores as Record<string, unknown>)
+      : []);
           if (ids.length > 0) {
-            setStores(ss.filter((x: any) => ids.includes(x.id)));
+            setStores(ss.filter((x: StoreSummary) => ids.includes(x.id)));
           }
         }
       } catch {}
@@ -73,10 +79,11 @@ export default function ShoppingPage() {
   async function onSaveHeader() {
     try {
       setSaving(true);
-      await saveShoppingCF({ slug, address, lat: lat === "" ? null : Number(lat), lng: lng === "" ? null : Number(lng) });
+      await updateShoppingCF({ slug, address, lat: lat === "" ? undefined : Number(lat), lng: lng === "" ? undefined : Number(lng) });
       toast.success("Dados do shopping salvos");
-    } catch (e: any) {
-      toast.error(String(e?.message || e));
+    } catch (e: unknown) {
+      const __msg = (e instanceof Error) ? e.message : String(e);
+        toast.error(__msg);
     } finally {
       setSaving(false);
     }
@@ -135,7 +142,13 @@ export default function ShoppingPage() {
       {/* AVALIAÇÃO */}
       <section className="rounded-xl border p-4 mt-6 max-w-3xl">
         <div className="text-lg font-semibold mb-3">Avaliação (Likert 1–5)</div>
-        <div className="flex items-center gap-2">          {[1,2,3,4,5].map((n) => (            <button key={n} className="border rounded-lg px-2 py-1" onClick={async () => {              try {                const r = await rateShoppingCF({ slug, score: n });                setAvg(r.avg);                setVotes(r.votes);              } catch (e: any) {                toast.error(String(e?.message || e));              }            }}>{n}</button>          ))}        </div>
+        <div className="flex items-center gap-2">          {[1,2,3,4,5].map((n) => (            <button key={n} className="border rounded-lg px-2 py-1" onClick={async () => {              try {                const r = await submitShoppingLikertCF({ slug, value: n });                setAvg(r.avg);
+const __votes = (r as unknown as { votes?: number; count?: number; total?: number; n?: number }).votes ??
+                (r as unknown as { count?: number }).count ??
+                (r as unknown as { total?: number }).total ??
+                (r as unknown as { n?: number }).n ?? 0;
+setVotes(__votes);              } catch (e: unknown) {                const __msg = (e instanceof Error) ? e.message : String(e);
+        toast.error(__msg);              }            }}>{n}</button>          ))}        </div>
         <div className="mt-2 text-sm text-muted-foreground">          Média: {typeof avg === 'number' ? avg.toFixed(2) : '–'} • Votos: {votes ?? 0}        </div>
       </section>
 
@@ -157,19 +170,25 @@ export default function ShoppingPage() {
             onChange={(e) => setNewChair((p) => ({ ...p, capacity: e.target.value === "" ? undefined : Number(e.target.value) }))}
           />
           <button
-            className="border rounded-lg px-3 py-1"            onClick={async () => {              if (!newChair.label) return;              try {                const c = await addChairCF({ slug, label: newChair.label, capacity: newChair.capacity });                setChairs((prev) => [...prev, c as any]);                setNewChair({ label: "", capacity: undefined });              } catch (e: any) {                toast.error(String(e?.message || e));              }            }}
+            className="border rounded-lg px-3 py-1"            onClick={async () => {              if (!newChair.label) return;              try {                const c = await upsertChairCF({ slug, chair: { label: newChair.label, capacity: newChair.capacity } });                setChairs((prev) => {
+  const nc = c as { id: string; label: string; capacity?: number };
+  return [...prev, nc];
+});
+setNewChair({ label: "", capacity: undefined });              } catch (e: unknown) {                const __msg = (e instanceof Error) ? e.message : String(e);
+        toast.error(__msg);              }            }}
 >            Adicionar
           </button>
         </div>
 
         <div className="grid md:grid-cols-2 gap-3">
-          {chairs.map((c) => (            <div key={c.id} className="rounded-lg border p-3 flex items-center justify-between">              <div>                <div className="font-medium">{c.label}</div>                <div className="text-xs text-muted-foreground">Capacidade: {c.capacity ?? 0}</div>              </div>              <button className="text-red-600 underline text-sm" onClick={async () => {                try {                  await deleteChairCF({ slug, id: c.id });                  setChairs((prev) => prev.filter((x) => x.id !== c.id));                } catch (e: any) {                  toast.error(String(e?.message || e));                }              }}>Remover</button>            </div>          ))}        </div>      </section>
+          {chairs.map((c) => (            <div key={c.id} className="rounded-lg border p-3 flex items-center justify-between">              <div>                <div className="font-medium">{c.label}</div>                <div className="text-xs text-muted-foreground">Capacidade: {c.capacity ?? 0}</div>              </div>              <button className="text-red-600 underline text-sm" onClick={async () => {                try {                  await deleteChairCF({ slug, id: c.id });                  setChairs((prev) => prev.filter((x) => x.id !== c.id));                } catch (e: unknown) {                  const __msg = (e instanceof Error) ? e.message : String(e);
+        toast.error(__msg);                }              }}>Remover</button>            </div>          ))}        </div>      </section>
 
       {/* LOJAS VINCULADAS */}
       <section className="rounded-xl border p-4 mt-6">
         <div className="text-lg font-semibold mb-2">Lojas vinculadas</div>
         <div className="grid gap-2">
-          {stores.map((s) => (            <div key={s.id} className="border rounded-lg p-3 flex items-center justify-between">              <div>                <div className="font-medium">{s.name}</div>                <div className="text-xs text-muted-foreground">ID: {s.id}</div>              </div>              <div className="flex items-center gap-2">                <button onClick={async () => {                  await approveStoreInShoppingCF({ shoppingSlug: slug, storeId: s.id });                  toast.success("Loja aprovada");                }} className="border rounded-lg px-3 py-1">Aprovar</button>                <button onClick={async () => {                  await suspendStoreInShoppingCF({ shoppingSlug: slug, storeId: s.id, suspended: !(s as any).suspended });                }} className="border rounded-lg px-3 py-1">{(s as any).suspended ? 'Reativar' : 'Suspender'}</button>              </div>            </div>          ))}          {stores.length === 0 ? <div className="text-sm text-muted-foreground">Nenhuma loja vinculada a este shopping.</div> : null}        </div>      </section>
+          {stores.map((s: { id: string; name?: string; suspended?: boolean }) => (            <div key={s.id} className="border rounded-lg p-3 flex items-center justify-between">              <div>                <div className="font-medium">{s.name}</div>                <div className="text-xs text-muted-foreground">ID: {s.id}</div>              </div>              <div className="flex items-center gap-2">                <button onClick={async () => {                  await approveStoreInShoppingCF({ shoppingSlug: slug, storeId: s.id });                  toast.success("Loja aprovada");                }} className="border rounded-lg px-3 py-1">Aprovar</button>                <button onClick={async () => {                  await suspendStoreInShoppingCF({ shoppingSlug: slug, storeId: s.id, suspended: !s.suspended });                }} className="border rounded-lg px-3 py-1">{s.suspended ? 'Reativar' : 'Suspender'}</button>              </div>            </div>          ))}          {stores.length === 0 ? <div className="text-sm text-muted-foreground">Nenhuma loja vinculada a este shopping.</div> : null}        </div>      </section>
     </DashboardShell>
   );
 }

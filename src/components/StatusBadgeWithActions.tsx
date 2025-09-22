@@ -16,7 +16,6 @@ export default function StatusBadgeWithActions({
   orderId,
   className,
   cancelReason,
-  cancelAtStep,
 }: Props) {
   const steps = ORDER_FLOW as readonly string[];
   const isCanceled =
