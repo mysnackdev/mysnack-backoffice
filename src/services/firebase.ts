@@ -1,9 +1,11 @@
+
 // src/services/firebase.ts
 // Adapter para o import "@/services/firebase"
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getDatabase, type Database } from "firebase/database";
+import { getAuth, type Auth } from "firebase/auth";
+import { getFunctions, type Functions } from "firebase/functions";
 
-// Tenta ler config do ambiente (Next.js usa NEXT_PUBLIC_* no client)
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY as string,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN as string,
@@ -20,3 +22,6 @@ function ensureApp(): FirebaseApp {
 
 const app = ensureApp();
 export const db: Database = getDatabase(app);
+export const auth: Auth = getAuth(app);
+export const functions: Functions = getFunctions(app, 'us-central1');
+export default app;

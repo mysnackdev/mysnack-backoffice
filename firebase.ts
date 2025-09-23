@@ -2,6 +2,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
 import { getAuth } from 'firebase/auth';
+import { getFunctions } from 'firebase/functions';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY as string,
@@ -14,6 +15,8 @@ const firebaseConfig = {
 };
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-export const db = getDatabase(app);
-export const auth = getAuth(app);
-export default app;
+const db = getDatabase(app);
+const functions = getFunctions(app, 'us-central1');
+const auth = getAuth(app);
+
+export { app, db, auth, functions };

@@ -1,10 +1,8 @@
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../../firebase";
 
-type ListReq = { storeId?: string; limit?: number };
-type ListRes = { orders?: EnrichedOrder[]; storeId?: string };
-
-export type Address = { street?: string; logradouro?: string; line1?: string; number?: string | number; numero?: string | number; complement?: string; complemento?: string; line2?: string; neighborhood?: string; bairro?: string; city?: string; state?: string; zip?: string; postalCode?: string; cep?: string; [key: string]: unknown };
+// Keep TS shape in sync with function's return
+export type Address = { city?: string | null; state?: string | null; zip?: string | null; [key: string]: unknown };
 
 export type EnrichedOrder = {
   id: string;
@@ -19,6 +17,8 @@ export type EnrichedOrder = {
   userPhone?: string | null;
   userCity?: string | null;
   userState?: string | null;
+  userDocument?: string | null;
+  userAddress?: Address | null;
   deliveryMode?: string | null;
   address?: Address | null;
   cancelReason?: string | null;
@@ -27,10 +27,22 @@ export type EnrichedOrder = {
   total?: number | null;
 };
 
+type ListReq = { storeId?: string; limit?: number };
+type ListRes = { orders?: EnrichedOrder[]; storeId?: string };
+
 export async function fetchMyStoreOrdersEnriched(storeId?: string, limit = 50): Promise<EnrichedOrder[]> {
-  const call = httpsCallable<ListReq, ListRes>(functions, "listMyStoreOrdersEnriched");
-  const effectiveStore = storeId || process.env.NEXT_PUBLIC_DEFAULT_STORE_ID || '9Hx7KMaUf0P1yED6OTALvv5wnbI2';
-  const res = await call({ storeId: effectiveStore, limit });
-  const data: ListRes = res.data || {};
-  return Array.isArray(data.orders) ? (data.orders as EnrichedOrder[]) : [];
+  // ❗️Do NOT use env fallback. Caller must resolve storeId (OperatorGate/useOperatorApproval)
+  if (!storeId) return [];
+  try {
+    // Prefer the stable function name exported by cloud functions
+    const call = httpsCallable<ListReq, ListRes>(functions, "listStoreOrdersEnriched");
+    const res = await call({ storeId, limit });
+    const data: ListRes = (res?.data as any) || {};
+    const orders = Array.isArray((data as any).orders) ? (data as any).orders as EnrichedOrder[] : [];
+    return orders;
+  } catch (e) {
+    console.error("[fetchMyStoreOrdersEnriched] callable error", e);
+    // Fail closed with empty list to avoid overlay
+    return [];
+  }
 }

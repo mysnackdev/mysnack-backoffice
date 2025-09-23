@@ -3,27 +3,32 @@
 
 import React from "react";
 import { useOperatorApproval } from "@/hooks/useOperatorApproval";
-import { subscribeOrdersByStore, type StoreMirrorOrder } from "@/services/orders.mirror.service";
+import { fetchMyStoreOrdersEnriched, type EnrichedOrder } from "@/services/orders.enriched.service";
 import StatusBadgeWithActions from "@/components/StatusBadgeWithActions";
 import { LoadingContainer } from "@/components/loading-container.component";
 
-function OrderCard({ o }: { o: StoreMirrorOrder }) {
+function OrderCard({ o }: { o: EnrichedOrder }) {
   const created = o.createdAt ? new Date(o.createdAt).toLocaleString("pt-BR") : "";
-  const number = o.number || ("#" + (o.key?.slice?.(-4) ?? ""));
-  const user = o.userName || "Cliente";
+  const number = o.number || ("#" + (o.id?.slice?.(-4) ?? ""));
+  const user = o.userName || o.userEmail || "Cliente";
+  const subtitle = [o.userEmail, o.userPhone].filter(Boolean).join(" · ");
+  const extra = [o.userDocument, (o.userCity && o.userState ? `${o.userCity}/${o.userState}` : o.userCity)].filter(Boolean).join(" · ");
+
   return (
     <li className="rounded-xl border bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3 border-b pb-3 mb-3">
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground">Cliente</p>
           <p className="font-semibold truncate">{user}</p>
+          <p className="text-[12px] text-muted-foreground truncate">{subtitle || "—"}</p>
+          {extra && <p className="text-[11px] text-muted-foreground truncate">{extra}</p>}
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">{created}</p>
           <p className="text-[11px] text-muted-foreground">{number}</p>
         </div>
       </div>
-      <StatusBadgeWithActions status={o.status} orderId={o.key} />
+      <StatusBadgeWithActions status={o.status} orderId={o.id} />
     </li>
   );
 }
@@ -31,26 +36,20 @@ function OrderCard({ o }: { o: StoreMirrorOrder }) {
 export default function AllOrdersSection() {
   const { approved, storeId } = useOperatorApproval();
   const [loading, setLoading] = React.useState(true);
-  const [items, setItems] = React.useState<StoreMirrorOrder[]>([]);
+  const [items, setItems] = React.useState<EnrichedOrder[]>([]);
 
-  React.useEffect(() => {
-    let off: (() => void) | undefined;
-    async function run() {
-      if (!approved || !storeId) {
-        setItems([]);
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      off = await subscribeOrdersByStore(storeId, (orders) => {
-        const list = (orders || []).slice().sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
-        setItems(list);
-        setLoading(false);
-      });
+  const refresh = React.useCallback(async (sId?: string) => {
+    if (!sId) { setItems([]); setLoading(false); return; }
+    setLoading(true);
+    try {
+      const list = await fetchMyStoreOrdersEnriched(sId, 120);
+      setItems(list);
+    } finally {
+      setLoading(false);
     }
-    run();
-    return () => { if (off) off(); };
-  }, [approved, storeId]);
+  }, []);
+
+  React.useEffect(() => { refresh(approved ? storeId || undefined : undefined); }, [approved, storeId, refresh]);
 
   return (
     <section className="mt-6">
@@ -63,7 +62,7 @@ export default function AllOrdersSection() {
         ) : (
           <ul className="space-y-3">
             {items.map((o) => (
-              <OrderCard key={o.key} o={o} />
+              <OrderCard key={o.id} o={o} />
             ))}
           </ul>
         )}
