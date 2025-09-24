@@ -3,6 +3,7 @@ import type { Shop } from "@/services/admin.service";
 // src/app/shopping/page.tsx
 
 import React from "react";
+import PaymentsCard from "@/components/shopping/PaymentsCard";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import DashboardShell from "@/components/DashboardShell";
@@ -189,6 +190,7 @@ setNewChair({ label: "", capacity: undefined });              } catch (e: unknow
         <div className="text-lg font-semibold mb-2">Lojas vinculadas</div>
         <div className="grid gap-2">
           {stores.map((s: { id: string; name?: string; suspended?: boolean }) => (            <div key={s.id} className="border rounded-lg p-3 flex items-center justify-between">              <div>                <div className="font-medium">{s.name}</div>                <div className="text-xs text-muted-foreground">ID: {s.id}</div>              </div>              <div className="flex items-center gap-2">                <button onClick={async () => {                  await approveStoreInShoppingCF({ shoppingSlug: slug, storeId: s.id });                  toast.success("Loja aprovada");                }} className="border rounded-lg px-3 py-1">Aprovar</button>                <button onClick={async () => {                  await suspendStoreInShoppingCF({ shoppingSlug: slug, storeId: s.id, suspended: !s.suspended });                }} className="border rounded-lg px-3 py-1">{s.suspended ? 'Reativar' : 'Suspender'}</button>              </div>            </div>          ))}          {stores.length === 0 ? <div className="text-sm text-muted-foreground">Nenhuma loja vinculada a este shopping.</div> : null}        </div>      </section>
+          <PaymentsCard slug={slug} />
     </DashboardShell>
   );
 }
