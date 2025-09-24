@@ -8,7 +8,6 @@ import AdminHome from "@/components/admin/AdminHome";
 import StoreHome from "@/components/store/StoreHome";
 import OperatorHome from "@/components/operator/OperatorHome";
 import RecentOrdersByClientSection from "@/components/recent-orders-by-client.section";
-import OverdueOrders15 from "@/components/overdue-orders.component";
 import AllOrdersSection from "@/components/all-orders.section";
 
 function Segmented({ tab, setTab }: { tab: "orders" | "byClient"; setTab: (t:"orders"|"byClient")=>void }) {
@@ -59,8 +58,7 @@ export default function Home() {
             <Segmented tab={tab} setTab={setTab} />
             {tab === "orders" ? (
               <>
-                <OverdueOrders15 />
-                <AllOrdersSection />
+<AllOrdersSection />
               </>
             ) : (
               <RecentOrdersByClientSection />
@@ -79,8 +77,7 @@ export default function Home() {
         <Segmented tab={tab} setTab={setTab} />
         {tab === "orders" ? (
           <>
-            <OverdueOrders15 />
-            <AllOrdersSection />
+<AllOrdersSection />
           </>
         ) : (
           <RecentOrdersByClientSection />

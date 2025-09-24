@@ -6,7 +6,7 @@ import { subscribeOrdersByStore, type StoreMirrorOrder } from "@/services/orders
 import StatusBadgeWithActions from "@/components/StatusBadgeWithActions";
 import { LoadingContainer } from "@/components/loading-container.component";
 
-const MINUTES_15 = 15 * 60 * 1000;
+const MINUTES_15 = Number.POSITIVE_INFINITY; // neutralizado: sem regra de 
 
 function isDone(status?: string | null) {
   if (!status) return false;
@@ -69,7 +69,7 @@ export default function OverdueOrders15() {
 
   return (
     <section className="mt-4">
-      <h2 className="text-sm font-semibold mb-2">mais de 15min</h2>
+      <h2 className="text-sm font-semibold mb-2">mais de </h2>
       <LoadingContainer loading={loading}>
         {items.length === 0 ? (
           <div className="text-sm text-muted-foreground border rounded-md p-3 bg-white">

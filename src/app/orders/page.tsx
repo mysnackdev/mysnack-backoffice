@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import Segmented from "@/components/orders.tabs";
-import OverdueOrders15 from "@/components/overdue-orders.component";
 import RecentOrdersByClientSection from "@/components/recent-orders-by-client.section";
 import AllOrdersSection from "@/components/all-orders.section";
 
@@ -12,8 +11,7 @@ export default function OrdersPage() {
       <Segmented tab={tab} setTab={setTab} />
       {tab === "orders" ? (
         <>
-          <OverdueOrders15 />
-          <AllOrdersSection />
+<AllOrdersSection />
         </>
       ) : (
         <RecentOrdersByClientSection />

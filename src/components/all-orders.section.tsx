@@ -1,62 +1,239 @@
-
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useOperatorApproval } from "@/hooks/useOperatorApproval";
 import { fetchMyStoreOrdersEnriched, type EnrichedOrder } from "@/services/orders.enriched.service";
 import StatusBadgeWithActions from "@/components/StatusBadgeWithActions";
 import { LoadingContainer } from "@/components/loading-container.component";
+import { getClientProfiles } from "@/services/profiles.service";
+import { db } from "../../firebase";
+import { get, ref } from "firebase/database";
+
+function OrderItems({ order }: { order: any }) {
+  // Normaliza items vindo de /orders/{id}/items como array OU objeto
+  const rawAny = order?.items;
+  const raw: any[] = Array.isArray(rawAny) ? rawAny : (rawAny && typeof rawAny === "object" ? Object.values(rawAny) : []);
+  const preview: string[] = Array.isArray(order?.itemsPreview) ? order.itemsPreview : [];
+  const hasRaw = raw && raw.length > 0;
+
+  function parseNum(v: any): number | null {
+    if (v == null) return null;
+    if (typeof v === "number") return v;
+    if (typeof v === "string") {
+      const s = v.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+      const n = Number(s);
+      return isNaN(n) ? null : n;
+    }
+    return null;
+  }
+  function pick<T>(...vals: T[]) { return vals.find((x) => x !== undefined && x !== null); }
+  function fromCentsMaybe(v: any, fallback?: any) {
+    const n = parseNum(v);
+    if (n == null) return fallback ?? null;
+    return n >= 100 ? n / 100 : n;
+  }
+  function stringifyOptions(x: any): string | null {
+    const acc: string[] = [];
+    const walk = (y: any) => {
+      if (!y) return;
+      if (typeof y === "string" || typeof y === "number") acc.push(String(y));
+      else if (Array.isArray(y)) y.forEach(walk);
+      else if (typeof y === "object") Object.values(y).forEach(walk);
+    };
+    walk(x);
+    return acc.length ? acc.join(", ") : null;
+  }
+  function fmtBRL(v?: number | null) {
+    try { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v ?? 0)); } catch { return "R$ 0,00"; }
+  }
+
+  if (hasRaw) {
+    const rows = raw.map((it: any) => {
+      const name = pick(it?.name, it?.title, it?.productName, it?.product?.name, it?.label, "Item");
+      const qty = parseNum(pick(it?.quantity, it?.qty, it?.qtd, 1)) || 1;
+
+      const unitCandidates = [
+        it?.unitPrice, it?.price, it?.unit_price, it?.priceUnit, it?.unit_value, it?.unit,
+        it?.unitPriceCents, it?.priceCents, it?.unit_cents, it?.amount_unit
+      ];
+      const unitRaw = pick(...unitCandidates);
+      const unit = fromCentsMaybe(unitRaw);
+
+      let total = parseNum(pick(it?.total, it?.subtotal, it?.lineTotal, it?.sum));
+      if (total == null && unit != null) total = unit * qty;
+
+      const opts = stringifyOptions(pick(it?.optionsText, it?.options_label, it?.options, it?.complements, it?.addons, it?.extras, it?.variations, it?.modifiers));
+
+      return { name, qty, unit, total, opts, key: pick(it?.id, it?.key) };
+    });
+
+    const totalOrder = rows.reduce((acc, r) => acc + (r.total ?? 0), 0);
+
+    const deliveryFee = pick(order?.deliveryFee, order?.frete, order?.shippingFee, order?.delivery?.fee);
+    const serviceFee  = pick(order?.serviceFee,  order?.taxa,  order?.fees?.service);
+    const discount    = pick(order?.discount, order?.couponDiscount, order?.cupomDesconto, order?.desconto);
+    const totalProvided = pick(order?.total, order?.amount);
+    const grandTotal = (totalProvided != null)
+      ? Number(totalProvided)
+      : Number(totalOrder || 0) + Number(serviceFee || 0) + Number(deliveryFee || 0) - Number(discount || 0);
+
+    return (
+      <>
+        <ul className="mt-2 pt-1 space-y-1">
+          {rows.map((r, idx) => (
+            <li key={r.key || idx} className="grid grid-cols-[40px,1fr,84px,96px] items-center gap-1 py-0.5">
+              <div className="text-right tabular-nums text-zinc-600">{r.qty}×</div>
+              <div className="min-w-0">
+                <div className="truncate">{r.name}</div>
+                {r.opts && <div className="text-[11px] text-zinc-500 truncate">{r.opts}</div>}
+              </div>
+              <div className="text-right text-[13px] tabular-nums">{r.unit != null ? fmtBRL(r.unit) : "—"}</div>
+              <div className="text-right text-[13px] font-medium tabular-nums">{r.total != null ? fmtBRL(r.total) : (r.unit != null ? fmtBRL(r.unit * r.qty) : "—")}</div>
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-2 grid grid-cols-[1fr,100px] gap-2">
+          <div className="text-right text-[12px] text-zinc-600">Subtotal</div>
+          <div className="text-right text-[13px] tabular-nums">{fmtBRL(totalOrder)}</div>
+
+          {serviceFee != null && (<>
+            <div className="text-right text-[12px] text-zinc-600">Taxa de serviço</div>
+            <div className="text-right text-[13px] tabular-nums">{fmtBRL(serviceFee)}</div>
+          </>)}
+
+          {deliveryFee != null && (<>
+            <div className="text-right text-[12px] text-zinc-600">Entrega</div>
+            <div className="text-right text-[13px] tabular-nums">{fmtBRL(deliveryFee)}</div>
+          </>)}
+
+          {discount != null && Number(discount) !== 0 && (<>
+            <div className="text-right text-[12px] text-zinc-600">Desconto</div>
+            <div className="text-right text-[13px] tabular-nums">- {fmtBRL(Math.abs(Number(discount)))}</div>
+          </>)}
+
+          <div className="text-right text-[13px] font-semibold">Total do pedido</div>
+          <div className="text-right text-[13px] font-semibold tabular-nums">{fmtBRL(grandTotal)}</div>
+        </div>
+      </>
+    );
+  }
+
+  if (preview && preview.length) {
+    return (
+      <ul className="mt-3 border-t pt-3 space-y-1 text-[12px]">
+        {preview.map((label: string, idx: number) => (
+          <li key={idx} className="flex justify-between gap-3">
+            <div className="truncate">{label}</div>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return null;
+}
 
 function OrderCard({ o }: { o: EnrichedOrder }) {
   const created = o.createdAt ? new Date(o.createdAt).toLocaleString("pt-BR") : "";
   const number = o.number || ("#" + (o.id?.slice?.(-4) ?? ""));
   const user = o.userName || o.userEmail || "Cliente";
-  const subtitle = [o.userEmail, o.userPhone].filter(Boolean).join(" · ");
-  const extra = [o.userDocument, (o.userCity && o.userState ? `${o.userCity}/${o.userState}` : o.userCity)].filter(Boolean).join(" · ");
+  const subtitle = [o.userEmail, (o as any).userPhone].filter(Boolean).join(" · ");
+  const extra = [ (o as any).userDocument, ((o as any).userCity && (o as any).userState ? `${(o as any).userCity}/${(o as any).userState}` : (o as any).userCity) ]
+    .filter(Boolean).join(" · ");
 
   return (
-    <li className="rounded-xl border bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3 border-b pb-3 mb-3">
+    <li className="rounded-xl border bg-white p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2 pb-2">
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">Cliente</p>
-          <p className="font-semibold truncate">{user}</p>
-          <p className="text-[12px] text-muted-foreground truncate">{subtitle || "—"}</p>
+          <p className="text-[11px] text-muted-foreground">Cliente</p>
+          <p className="font-medium text-[14px] truncate">{user}</p>
+          {subtitle && <p className="text-[12px] text-muted-foreground truncate">{subtitle}</p>}
           {extra && <p className="text-[11px] text-muted-foreground truncate">{extra}</p>}
         </div>
         <div className="text-right">
-          <p className="text-xs text-muted-foreground">{created}</p>
+          <p className="text-[11px] text-muted-foreground">{created}</p>
           <p className="text-[11px] text-muted-foreground">{number}</p>
         </div>
       </div>
+
       <StatusBadgeWithActions status={o.status} orderId={o.id} />
+      
+      {/* Observações (opcional) */}
+      
+      {/* Observações (opcional) */}
+      {(() => {
+        const note = (o as any).notes ?? (o as any).observations ?? (o as any).obs ?? null;
+        if (!note) return null;
+        return <div className="mt-2 text-[12px] text-zinc-700 bg-zinc-50 rounded px-2 py-1 whitespace-pre-wrap">{String(note)}</div>;
+      })()}
+    
+      {(() => {
+        const note = (o as any).notes ?? (o as any).observations ?? (o as any).obs ?? null;
+        if (!note) return null;
+        return <div className="mt-2 text-[12px] text-zinc-700 bg-zinc-50 rounded px-2 py-1 whitespace-pre-wrap">{String(note)}</div>;
+      })()}
+    
+      <OrderItems order={o} />
     </li>
   );
 }
 
 export default function AllOrdersSection() {
-  const { approved, storeId } = useOperatorApproval();
-  const [loading, setLoading] = React.useState(true);
-  const [items, setItems] = React.useState<EnrichedOrder[]>([]);
+  const { storeId } = useOperatorApproval();
+  const [items, setItems] = useState<EnrichedOrder[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const refresh = React.useCallback(async (sId?: string) => {
-    if (!sId) { setItems([]); setLoading(false); return; }
-    setLoading(true);
-    try {
-      const list = await fetchMyStoreOrdersEnriched(sId, 120);
-      setItems(list);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    let alive = true;
+    async function refresh() {
+      if (!storeId) return;
+      setLoading(true);
+      try {
+        let list = await fetchMyStoreOrdersEnriched(storeId, 120);
+        // Enriquecer com perfis (email/nome) quando ausentes
+        try {
+          const ids = Array.from(new Set(list.map(x => x.userId).filter(Boolean))) as string[];
+          const needProfile = list.some(x => !x.userEmail) && ids.length > 0;
+          if (needProfile) {
+            const profiles = await getClientProfiles(storeId, ids);
+            list = list.map((o) => {
+              const p = (o.userId && (profiles as any)[o.userId as string]) as any;
+              return p ? { ...o, userEmail: o.userEmail || (p as any).email || null, userName: o.userName || (p as any).displayName || (p as any).email || null, userPhone: (o as any).userPhone || (p as any).phone || null } : o;
+            });
+          }
+        } catch (e) {
+          console.error("profiles enrichment failed", e);
+        }
+
+        // Hidratar itens do nó /orders/{id}
+        try {
+          const hydrated = await Promise.all(list.map(async (o) => {
+            try {
+              const snap = await get(ref(db, `orders/${o.id}`));
+              const val: any = snap.val() || null;
+              if (val) return { ...o, ...val };
+            } catch {}
+            return o;
+          }));
+          list = hydrated;
+        } catch (e) {
+          console.warn("hydrate batch failed", e);
+        }
+
+        if (alive) setItems(list);
+      } finally {
+        if (alive) setLoading(false);
+      }
     }
-  }, []);
-
-  React.useEffect(() => { refresh(approved ? storeId || undefined : undefined); }, [approved, storeId, refresh]);
+    refresh();
+    return () => { alive = false; };
+  }, [storeId]);
 
   return (
-    <section className="mt-6">
-      <h2 className="text-sm font-semibold mb-2">pedidos</h2>
+    <section className="space-y-3">
       <LoadingContainer loading={loading}>
         {items.length === 0 ? (
-          <div className="text-sm text-muted-foreground border rounded-md p-3 bg-white">
+          <div className="text-[12px] text-muted-foreground border rounded-md p-3 bg-white">
             Nenhum pedido.
           </div>
         ) : (
