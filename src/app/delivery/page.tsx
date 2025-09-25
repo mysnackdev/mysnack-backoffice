@@ -185,7 +185,7 @@ export default function DeliveryPage() {
   React.useEffect(() => {
     if (!user) return;
     const uid = user.uid;
-    const rStatus = ref(db, `backoffice/stores/${uid}/status`);
+    const rStatus = ref(db, `backoffice/tenants/${uid}/status`);
     const offS = onValue(rStatus, (s) =>
       setOnline(!!(s.val() as { online?: boolean } | null)?.online)
     );
@@ -289,7 +289,7 @@ export default function DeliveryPage() {
       };
 
       await update(ref(db, `backoffice/tenants/${uid}/delivery`), toSave);
-      await update(ref(db, `backoffice/stores/${uid}/lastUpdated`), {
+      await update(ref(db, `backoffice/tenants/${uid}/lastUpdated`), {
         delivery: Date.now(),
       });
 

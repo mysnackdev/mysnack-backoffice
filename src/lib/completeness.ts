@@ -10,12 +10,12 @@ export type CompletenessResult = { complete: boolean; missing: string[] };
  * - `cadastroCompleto` = true quando:
  *    1) Loja tem NOME (em qualquer um dos campos conhecidos) e
  *    2) Loja tem TELEFONE (storeProfile.telefone OU users/{uid}.phone) e
- *    3) Loja está vinculada a um SHOPPING (stores/{uid}.shoppingSlug)
+ *    3) Loja está vinculada a um SHOPPING (tenants/{uid}.shoppingSlug)
  *
  * Observação: este módulo é resiliente às variações de caminho já usadas no app:
  *  - Perfil: `backoffice/tenants/{uid}/storeProfile`
  *  - Usuário: `backoffice/users/{uid}`
- *  - Shopping: `backoffice/stores/{uid}.shoppingSlug`
+ *  - Shopping: `backoffice/tenants/{uid}.shoppingSlug`
  */
 type StoreProfileData = {
   shoppingSlug?: string | null;
@@ -35,15 +35,15 @@ function pickPhone(p: Partial<StoreProfileData>, user?: { phone?: string | null 
 
 export async function evaluateCompleteness(uid: string): Promise<CompletenessResult> {
   // Leituras paralelas e tolerantes ao schema:
-  const [profileSnap, userSnap, storeSnap] = await Promise.all([
+  const [profileSnap, userSnap] = await Promise.all([
     get(ref(db, `backoffice/tenants/${uid}/storeProfile`)),
     get(ref(db, `backoffice/users/${uid}`)),
-    get(ref(db, `backoffice/stores/${uid}`)),
+    
   ]);
 
   const profile = (profileSnap.exists() ? profileSnap.val() : {}) as Partial<StoreProfileData>;
   const user = (userSnap.exists() ? userSnap.val() : {}) as { phone?: string | null };
-  const store = (storeSnap.exists() ? storeSnap.val() : {}) as { shoppingSlug?: string | null };
+  
 
   const missing: string[] = [];
 
@@ -53,7 +53,8 @@ export async function evaluateCompleteness(uid: string): Promise<CompletenessRes
   const phone = pickPhone(profile, user);
   if (!phone) missing.push("Telefone de contato");
 
-  const shoppingSlug = (profile.shoppingSlug ?? store.shoppingSlug) as string | null | undefined;
+  const shoppingSlugRootSnap = await get(ref(db, `backoffice/tenants/${uid}/shoppingSlug`));
+  const shoppingSlug = (shoppingSlugRootSnap.val() as string | null) || (profile.shoppingSlug as string | null | undefined);
   if (!shoppingSlug) missing.push("Vínculo com shopping");
 
   return { complete: missing.length === 0, missing };
@@ -61,7 +62,7 @@ export async function evaluateCompleteness(uid: string): Promise<CompletenessRes
 
 export async function syncSetupStatus(uid: string): Promise<CompletenessResult> {
   const result = await evaluateCompleteness(uid);
-  await update(ref(db, `backoffice/stores/${uid}/status`), {
+  await update(ref(db, `backoffice/tenants/${uid}/status`), {
     cadastroCompleto: result.complete,
     setup: result.complete ? "configurado" : "em_configuracao",
     setupUpdatedAt: Date.now(),

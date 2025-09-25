@@ -9,8 +9,9 @@ function canToggleOnline(): boolean {
 
 
 import React, { useEffect, useState } from "react";
-import { ref, onValue, update } from "firebase/database";
+import { ref, onValue } from "firebase/database";
 import { db } from "@/firebase";
+import { setTenantOnlineCF } from "@/services/admin.service";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/components/ui/toast";
 
@@ -34,6 +35,7 @@ function reasonText(code?: string | null): string {
     case "awaiting-approval": return "Aguardando aprovação do shopping";
     case "suspended": return "Loja suspensa pelo shopping";
     case "denied": return "Regras não atendidas para ficar online";
+    case "incomplete-setup": return "Complete as etapas obrigatórias";
     default: return code;
   }
 }
@@ -46,21 +48,20 @@ export default function StoreStatusToolbar() {
   const [cadastroCompleto, setCadastroCompleto] = useState(false);
   const [_setup, setSetup] = useState<Setup>("em_configuracao");
   const [shoppingSlug, setShoppingSlug] = useState<string | null>(null);
-  const [approved, setApproved] = useState<boolean>(false);
   const [suspended, setSuspended] = useState<boolean>(false);
   const [reason, setReason] = useState<string | null>(null);
 
   useEffect(() => {
     if (!uid) return;
-    const r = ref(db, `backoffice/stores/${uid}`);
+    const r = ref(db, `backoffice/tenants/${uid}`);
     const off = onValue(r, (snap) => {
       const base = (snap.val() || {}) as StoreDoc;
       const st = base.status || {};
       setOnline(Boolean(st.online));
       setCadastroCompleto(Boolean(st.cadastroCompleto));
-      setSetup((st._setup as Setup) || "em_configuracao");
+      setSetup((st.setup as Setup) || "em_configuracao");
       setShoppingSlug(base.shoppingSlug || null);
-      setApproved(Boolean(base.approved));
+      
       setSuspended(Boolean(base.suspended));
       setReason(st.onlineReason || null);
     });
@@ -71,15 +72,9 @@ export default function StoreStatusToolbar() {
   async function toggleOnline() {
     if (!uid) return;
     // Guardas de pré-requisito: mostrar alerta mas não bloquear o clique
-    if (suspended) { toast.error("Loja suspensa pelo shopping"); return; }
     if (!shoppingSlug) { toast.error("Escolha um shopping para ficar online"); return; }
-    if (!approved) { toast.error("Aguardando aprovação do shopping"); return; }
     if (!cadastroCompleto) { toast.error("Finalize o cadastro para ativar a loja"); return; }
-    await update(ref(db, `backoffice/stores/${uid}/status`), {
-      online: !online,
-      // limpar motivo ao tentar ficar online; guardiões reescreverão se necessário
-      onlineReason: null,
-    });
+    await setTenantOnlineCF({ storeId: uid, online: !online });
   }
 
   return (
@@ -96,10 +91,7 @@ export default function StoreStatusToolbar() {
             : !shoppingSlug
             ? "Escolha um shopping"
             : suspended
-            ? "Loja suspensa pelo shopping"
-            : !approved
-            ? "Aguardando aprovação do shopping"
-            : ""
+            ? "Loja suspensa pelo shopping": ""
         }
         className="rounded-lg px-3 py-2 text-sm border hover:bg-zinc-50 disabled:opacity-60"
       >

@@ -185,7 +185,7 @@ export default function MenuWizard() {
     const uid = user.uid;
 
     // 1) salva categorias
-    await set(ref(db, `backoffice/stores/${uid}/menu/categories`), selected);
+    await set(ref(db, `backoffice/tenants/${uid}/menu/categories`), selected);
 
     // 2) salva itens por categoria (push + upload opcional)
     for (const cat of selected) {
@@ -203,7 +203,7 @@ export default function MenuWizard() {
           updatedAt: Date.now(),
           createdBy: uid,
         };
-        const itemRef = push(ref(db, `backoffice/stores/${uid}/menu/items`));
+        const itemRef = push(ref(db, `backoffice/tenants/${uid}/menu/items`));
         await set(itemRef, payload);
         const key = itemRef.key as string;
 
@@ -213,7 +213,7 @@ export default function MenuWizard() {
           const sr = sRef(storage, path);
           await uploadBytes(sr, it.imageFile);
           const url = await getDownloadURL(sr);
-          await update(ref(db, `backoffice/stores/${uid}/menu/items/${key}`), {
+          await update(ref(db, `backoffice/tenants/${uid}/menu/items/${key}`), {
             imageUrl: url,
             updatedAt: Date.now(),
           });
@@ -222,7 +222,7 @@ export default function MenuWizard() {
     }
 
     // 3) lastUpdated/cardapio
-    await update(ref(db, `backoffice/stores/${uid}/lastUpdated`), {
+    await update(ref(db, `backoffice/tenants/${uid}/lastUpdated`), {
       cardapio: Date.now(),
     });
 

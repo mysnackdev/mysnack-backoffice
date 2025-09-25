@@ -97,3 +97,10 @@ export async function suspendStoreInShoppingCF(input: { shoppingSlug: string; st
   const res = await fn(input);
   return res.data;
 }
+
+
+export async function setTenantOnlineCF(input: { storeId: string; online: boolean }) {
+  const fn = httpsCallable<typeof input, { ok: true }>(functions, "setTenantOnline");
+  const res = await fn(input);
+  return res.data;
+}

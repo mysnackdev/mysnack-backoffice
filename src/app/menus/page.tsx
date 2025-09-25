@@ -82,10 +82,10 @@ export default function MenusPage() {
     if (!user) return;
     const uid = user.uid;
 
-    const r1 = ref(db, `backoffice/stores/${uid}/menu/categories`);
-    const r2 = ref(db, `backoffice/stores/${uid}/menu/items`);
-    const r3 = ref(db, `backoffice/stores/${uid}/status/online`);
-    const r4 = ref(db, `backoffice/stores/${uid}/lastUpdated/cardapio`);
+    const r1 = ref(db, `backoffice/tenants/${uid}/menu/categories`);
+    const r2 = ref(db, `backoffice/tenants/${uid}/menu/items`);
+    const r3 = ref(db, `backoffice/tenants/${uid}/status/online`);
+    const r4 = ref(db, `backoffice/tenants/${uid}/lastUpdated/cardapio`);
 
     const unsub1 = onValue(r1, (snap) => {
       const v = snap.val();
@@ -149,7 +149,7 @@ export default function MenusPage() {
   }, [categories, items]);
 
   async function touchLastUpdated(uid: string) {
-    await update(ref(db, `backoffice/stores/${uid}/lastUpdated`), {
+    await update(ref(db, `backoffice/tenants/${uid}/lastUpdated`), {
       cardapio: Date.now(),
     });
   }
@@ -159,7 +159,7 @@ export default function MenusPage() {
     const uid = user.uid;
     const key = editing.key;
 
-    await update(ref(db, `backoffice/stores/${uid}/menu/items/${key}`), {
+    await update(ref(db, `backoffice/tenants/${uid}/menu/items/${key}`), {
       name: editing.name,
       description: editing.description ?? "",
       price: Number(editing.price || 0),
@@ -173,7 +173,7 @@ export default function MenusPage() {
       const sr = sRef(storage, path);
       await uploadBytes(sr, file);
       const url = await getDownloadURL(sr);
-      await update(ref(db, `backoffice/stores/${uid}/menu/items/${key}`), {
+      await update(ref(db, `backoffice/tenants/${uid}/menu/items/${key}`), {
         imageUrl: url,
         updatedAt: Date.now(),
       });
@@ -187,7 +187,7 @@ export default function MenusPage() {
   async function deleteItem(it: MenuItem) {
     if (!user) return;
     const uid = user.uid;
-    await remove(ref(db, `backoffice/stores/${uid}/menu/items/${it.key}`));
+    await remove(ref(db, `backoffice/tenants/${uid}/menu/items/${it.key}`));
     await touchLastUpdated(uid);
   }
 

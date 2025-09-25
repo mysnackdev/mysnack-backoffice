@@ -2,7 +2,7 @@
 "use client";
 
 import React from "react";
-import {  onValue, ref, update } from "firebase/database";
+import {  onValue, ref, update, set, child } from "firebase/database";
 import { db } from "@/firebase";
 import DashboardShell from "@/components/DashboardShell";
 import StoreStatusToolbar from "@/components/StoreStatusToolbar";
@@ -51,6 +51,7 @@ function AutocompleteShopping({
   onSelect: (slug: string) => void;
 }) {
   const [query, setQuery] = React.useState(value || "");
+  React.useEffect(() => { setQuery(value || ""); }, [value]);
   const [items, setItems] = React.useState<{ slug: string; name?: string }[]>([]);
   const debounced = useDebounced(query, 250);
 
@@ -133,7 +134,7 @@ export default function MinhaLojaPage() {
     });
 
     // Shopping vinculado
-    const rShop = ref(db, `backoffice/stores/${uid}/shoppingSlug`);
+    const rShop = ref(db, `backoffice/tenants/${uid}/shoppingSlug`);
     const off2 = onValue(rShop, (snap) => setShoppingSlug(snap.val() || null));
 
     return () => {
@@ -151,8 +152,8 @@ export default function MinhaLojaPage() {
 
   async function handleBlur<K extends keyof StoreProfile>(key: K) {
     const rProfile = ref(db, `backoffice/tenants/${uid}/storeProfile/${String(key)}`);
-    await update(rProfile, { ".": 0 }).catch(() => {}); // noop to ensure path
-    await update(ref(db, `backoffice/tenants/${uid}/storeProfile`), { [String(key)]: form[key] as unknown });
+    // usar SET direto no caminho (evita chaves inválidas no update)
+    await set(child(ref(db, `backoffice/tenants/${uid}/storeProfile`), String(key)), form[key] as unknown);
     await syncSetupStatus(uid);
   }
 
@@ -171,6 +172,8 @@ export default function MinhaLojaPage() {
       deliveryEta: form.deliveryEta || ""
     });
     await syncSetupStatus(uid);
+    // limpeza defensiva: remover nó legado em /backoffice/stores/{id}/status
+    try { await set(ref(db, `backoffice/stores/${uid}/status`), null); } catch {}
     toast.success("Dados salvos");
   }
 return (
@@ -363,7 +366,7 @@ return (
           </div>
         ) : null}
 
-        <AutocompleteShopping
+        <AutocompleteShopping key={shoppingSlug || 'none'}
           value={shoppingSlug}
           onSelect={async (slug) => {
             try {

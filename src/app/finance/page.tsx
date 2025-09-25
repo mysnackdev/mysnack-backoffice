@@ -192,7 +192,7 @@ export default function FinancePage() {
   React.useEffect(() => {
     if (!user) return;
     const uid = user.uid;
-    const rStatus = ref(db, `backoffice/stores/${uid}/status`);
+    const rStatus = ref(db, `backoffice/tenants/${uid}/status`);
     const offS = onValue(rStatus, (s) => {
       const val = (s.val() as { online?: boolean } | null) || {};
       setOnline(!!val.online);
@@ -307,7 +307,7 @@ export default function FinancePage() {
       };
 
       await update(ref(db, `backoffice/tenants/${uid}/finance`), payload);
-      await update(ref(db, `backoffice/stores/${uid}/lastUpdated`), { finance: Date.now() });
+      await update(ref(db, `backoffice/tenants/${uid}/lastUpdated`), { finance: Date.now() });
 
       await syncSetupStatus(uid);
       toast.success("Configurações financeiras salvas.");

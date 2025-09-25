@@ -13,7 +13,7 @@ export type MenuItem = {
 };
 
 export async function createMenuItem(uid: string, item: MenuItem){
-  const itemRef = push(ref(db, `backoffice/stores/${uid}/menu/items`));
+  const itemRef = push(ref(db, `backoffice/tenants/${uid}/menu/items`));
   const payload = { ...item, createdAt: Date.now() };
   await set(itemRef, payload);
   return itemRef.key;
