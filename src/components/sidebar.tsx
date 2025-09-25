@@ -90,14 +90,6 @@ export default function Sidebar() {
         <div className="pt-2 text-xs uppercase text-zinc-500 px-2">Configurações</div>
 
         <Link
-          href="/payment-methods"
-          className={itemClass(isPayments)}
-          aria-current={isPayments ? "page" : undefined}
-        >
-          Forma de pagamento
-        </Link>
-
-        <Link
           href="/delivery-configuration"
           className={itemClass(isDelivery)}
           aria-current={isDelivery ? "page" : undefined}

@@ -103,9 +103,6 @@ export default function DashboardShell({ children }: Props) {
             <div className="mt-3 text-xs uppercase text-zinc-500 px-3">
               Configurações
             </div>
-            <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/payment-methods">
-              Forma de pagamento
-            </Link>
             <Link className="block rounded-md px-3 py-2 hover:bg-zinc-100" href="/delivery">
               Configurações de entrega
             </Link>

@@ -4,153 +4,57 @@ import { db } from "@/firebase";
 
 export type CompletenessResult = { complete: boolean; missing: string[] };
 
-/** --------- Tipos mínimos usados nas validações --------- */
-type StoreProfileData = { shoppingSlug?: string;
-  nome?: string;
-  displayName?: string;
-  storeName?: string;
-  name?: string;
-  telefone?: string;
+/**
+ * Regra de 2025‑09‑24
+ * - Métodos de pagamento NÃO são obrigatórios para ficar online.
+ * - `cadastroCompleto` = true quando:
+ *    1) Loja tem NOME (em qualquer um dos campos conhecidos) e
+ *    2) Loja tem TELEFONE (storeProfile.telefone OU users/{uid}.phone) e
+ *    3) Loja está vinculada a um SHOPPING (stores/{uid}.shoppingSlug)
+ *
+ * Observação: este módulo é resiliente às variações de caminho já usadas no app:
+ *  - Perfil: `backoffice/tenants/{uid}/storeProfile`
+ *  - Usuário: `backoffice/users/{uid}`
+ *  - Shopping: `backoffice/stores/{uid}.shoppingSlug`
+ */
+type StoreProfileData = {
+  shoppingSlug?: string | null;
+  // possíveis chaves de nome usadas no projeto:
+  nome?: string; displayName?: string; storeName?: string; name?: string;
+  // possíveis chaves de telefone:
+  telefone?: string | null; phone?: string | null;
 };
 
-const PAYMENT_GROUPS = ["onDelivery", "appSite", "mysnackAwards", "banking"] as const;
-type PaymentGroupName = typeof PAYMENT_GROUPS[number];
-type PaymentRecord = Record<string, boolean>;
-type PaymentGroup = PaymentRecord | boolean[];
-type PaymentSettings = Partial<Record<PaymentGroupName, PaymentGroup>>;
+function pickName(p: Partial<StoreProfileData>): string | undefined {
+  return p.nome || p.displayName || p.storeName || p.name;
+}
 
-type OpeningHoursDay = { enabled?: boolean } | null | undefined;
-type OpeningHours = Record<string, OpeningHoursDay>;
-
-type DeliveryModes = { delivery?: boolean; pickup?: boolean; inhouse?: boolean };
-type DeliveryData = {
-  enabled?: boolean;
-  modes?: DeliveryModes;
-  areas?: Record<string, unknown>;
-};
-
-type PayoutSettings = {
-  provider?: "manual" | "stripe" | "pagarme";
-  automatic?: boolean;
-  cycle?: "semanal" | "mensal";
-  dayOfWeek?: number;
-  dayOfMonth?: number;
-  minPayout?: number;
-};
-
-type BankAccount = {
-  holderName?: string;
-  cpfCnpj?: string;
-  bankCode?: string;
-  agency?: string;
-  account?: string;
-  accountType?: "corrente" | "poupanca" | "conta_pagamento";
-  pixKeyType?: string;
-  pixKey?: string;
-};
-
-type FinanceData = {
-  bankAccount?: BankAccount;
-  payout?: PayoutSettings;
-  // outros campos ignorados para a checagem
-};
-
-function hasAnyTrue(group: PaymentGroup): boolean {
-  if (Array.isArray(group)) return group.some(Boolean);
-  return Object.values(group).some(Boolean);
+function pickPhone(p: Partial<StoreProfileData>, user?: { phone?: string | null }): string | undefined {
+  return (p.telefone as string) || (p.phone as string) || (user?.phone as string) || undefined;
 }
 
 export async function evaluateCompleteness(uid: string): Promise<CompletenessResult> {
-  const [
-    storeProfileSnap,
-    paymentsSnap,
-    openingHoursSnap,
-    menusTenantSnap,
-    menuLegacySnap,
-    deliverySnap,
-    financeSnap,
-  ] = await Promise.all([
+  // Leituras paralelas e tolerantes ao schema:
+  const [profileSnap, userSnap, storeSnap] = await Promise.all([
     get(ref(db, `backoffice/tenants/${uid}/storeProfile`)),
-    get(ref(db, `backoffice/tenants/${uid}/payments`)),
-    get(ref(db, `backoffice/tenants/${uid}/openingHours`)),
-    get(ref(db, `backoffice/tenants/${uid}/menus`)),
-    get(ref(db, `backoffice/stores/${uid}/menu/items`)),
-    get(ref(db, `backoffice/tenants/${uid}/delivery`)),
-    get(ref(db, `backoffice/tenants/${uid}/finance`)),
+    get(ref(db, `backoffice/users/${uid}`)),
+    get(ref(db, `backoffice/stores/${uid}`)),
   ]);
 
-  const storeProfile = (storeProfileSnap.exists() ? (storeProfileSnap.val() as unknown as StoreProfileData) : null);
-  const payments     = (paymentsSnap.exists() ? (paymentsSnap.val() as unknown as PaymentSettings) : null);
-  const openingHours = (openingHoursSnap.exists() ? (openingHoursSnap.val() as unknown as OpeningHours) : null);
-  const menusTenant  = (menusTenantSnap.exists() ? (menusTenantSnap.val() as unknown as Record<string, unknown>) : null);
-  const menuLegacy   = (menuLegacySnap.exists() ? (menuLegacySnap.val() as unknown as Record<string, unknown>) : null);
-  const delivery     = (deliverySnap.exists() ? (deliverySnap.val() as unknown as DeliveryData) : null);
-  const finance      = (financeSnap.exists() ? (financeSnap.val() as unknown as FinanceData) : null);
+  const profile = (profileSnap.exists() ? profileSnap.val() : {}) as Partial<StoreProfileData>;
+  const user = (userSnap.exists() ? userSnap.val() : {}) as { phone?: string | null };
+  const store = (storeSnap.exists() ? storeSnap.val() : {}) as { shoppingSlug?: string | null };
 
   const missing: string[] = [];
 
-  // Minha loja
-  const hasNome = !!(storeProfile?.nome || storeProfile?.displayName || storeProfile?.storeName || storeProfile?.name);
-  const hasTel  = !!storeProfile?.telefone;
-  if (!hasNome || !hasTel) {
-    const sub: string[] = [];
-    if (!hasNome) sub.push("nome da loja");
-    if (!hasTel)  sub.push("telefone de contato");
-    missing.push(`Minha loja (${sub.join(", ")})`);
-  }
+  const name = pickName(profile);
+  if (!name) missing.push("Nome da loja");
 
-  // Pagamentos (>=1 método)
-  let pagamentosOK = false;
-  if (payments && typeof payments === "object") {
-    pagamentosOK = PAYMENT_GROUPS.some((g) => {
-      const v = payments[g];
-      if (!v) return false;
-      return hasAnyTrue(v);
-    });
-  }
-  if (!pagamentosOK) missing.push("Forma de pagamento");
+  const phone = pickPhone(profile, user);
+  if (!phone) missing.push("Telefone de contato");
 
-  // Horário (>=1 dia enabled)
-  let horarioOK = false;
-  if (openingHours && typeof openingHours === "object") {
-    horarioOK = Object.values(openingHours).some((d) => !!d?.enabled);
-  }
-  if (!horarioOK) missing.push("Horário de funcionamento");
-
-  // Cardápio (checa novos e legados)
-  const hasItemsTenant = !!(menusTenant && typeof menusTenant === "object" && Object.keys(menusTenant).length > 0);
-  const hasItemsLegacy = !!(menuLegacy && typeof menuLegacy === "object" && Object.keys(menuLegacy).length > 0);
-  if (!(hasItemsTenant || hasItemsLegacy)) {
-    missing.push("Cardápio (adicione pelo menos 1 item)");
-  }
-
-  // Delivery
-  let deliveryOK = false;
-  if (delivery && typeof delivery === "object") {
-    const modes = delivery.modes || {};
-    const areas = delivery.areas || {};
-    const hasMode = !!(modes.delivery || modes.pickup || modes.inhouse);
-    const hasArea = typeof areas === "object" && Object.keys(areas).length > 0;
-    deliveryOK = delivery.enabled === true && hasMode && (modes.pickup || hasArea);
-  }
-  if (!deliveryOK) missing.push("Configurações de entrega");
-
-  // Finance
-  let financeOK = false;
-  if (finance && typeof finance === "object") {
-    const acc = finance.bankAccount || {};
-    const po  = finance.payout || {};
-    const baseOK =
-      !!acc.holderName &&
-      !!acc.cpfCnpj &&
-      !!acc.bankCode &&
-      !!acc.account &&
-      !!acc.accountType &&
-      (po.provider === "manual" || po.provider === "stripe" || po.provider === "pagarme") &&
-      (po.automatic === true || po.automatic === false);
-    financeOK = baseOK;
-  }
-  if (!financeOK) missing.push("Financeiro");
+  const shoppingSlug = (profile.shoppingSlug ?? store.shoppingSlug) as string | null | undefined;
+  if (!shoppingSlug) missing.push("Vínculo com shopping");
 
   return { complete: missing.length === 0, missing };
 }

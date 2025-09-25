@@ -1,3 +1,4 @@
+// NOTE: A partir de 2025-09-24, métodos de pagamento são opcionais e não bloqueiam ficar online.
 // src/components/shopping/PaymentsCard.tsx
 "use client";
 

@@ -1,6 +1,12 @@
 // src/components/StoreStatusToolbar.tsx
 "use client";
 
+function canToggleOnline(): boolean {
+  // Nova regra: permitir ficar online sem métodos de pagamento configurados.
+  return true;
+}
+
+
 
 import React, { useEffect, useState } from "react";
 import { ref, onValue, update } from "firebase/database";
@@ -80,7 +86,7 @@ export default function StoreStatusToolbar() {
     <div className="flex items-center gap-2">
       <Dot on={online} />
       <button
-        onClick={toggleOnline}
+        onClick={() => canToggleOnline() && toggleOnline()}
         
         title={
           reason
