@@ -99,6 +99,21 @@ export async function suspendStoreInShoppingCF(input: { shoppingSlug: string; st
 }
 
 
+
+
+export type SetStoreOnlineStatusInput = {
+  shoppingSlug: string;
+  storeId: string;
+  approved?: boolean;
+  suspended?: boolean;
+  reason?: string;
+};
+
+export async function setStoreOnlineStatusCF(input: SetStoreOnlineStatusInput) {
+  const fn = httpsCallable<typeof input, { ok: boolean; approved: boolean; suspended: boolean; updatedAt: number }>(functions, "setStoreOnlineStatus");
+  const res = await fn(input);
+  return res.data;
+}
 export async function setTenantOnlineCF(input: { storeId: string; online: boolean }) {
   const fn = httpsCallable<typeof input, { ok: true }>(functions, "setTenantOnline");
   const res = await fn(input);
