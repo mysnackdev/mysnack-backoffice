@@ -268,8 +268,7 @@ useEffect(() => {
       unsubs.push(legacyAdd as unknown as () => void);
       unsubs.push(legacyChg as unknown as () => void);
       unsubs.push(legacyRem as unknown as () => void);
-    } catch (_e) {
-      if (alive) setItems([]);
+    } catch {if (alive) setItems([]);
     } finally {
       if (alive) setLoading(false);
     }
@@ -277,7 +276,7 @@ useEffect(() => {
 
   return () => {
     alive = false;
-    unsubs.forEach(fn => { try { fn(); } catch (_e) {} });
+    unsubs.forEach(fn => { try { fn(); } catch {} });
   };
 }, [storeId]);
 

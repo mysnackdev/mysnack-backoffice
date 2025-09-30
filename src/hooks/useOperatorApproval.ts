@@ -34,7 +34,7 @@ export function useOperatorApproval(): ApprovalState {
     let offAuth: (() => void) | null = null;
 
     const stop = () => {
-      unsubs.forEach(fn => { try { fn(); } catch (_e) {} });
+      unsubs.forEach(fn => { try { fn(); } catch {} });
       unsubs = [];
     };
 
@@ -56,7 +56,7 @@ export function useOperatorApproval(): ApprovalState {
             break;
           }
         }
-      } catch (_e) {}
+      } catch {}
     }
 
     offAuth = auth.onIdTokenChanged(user => {
