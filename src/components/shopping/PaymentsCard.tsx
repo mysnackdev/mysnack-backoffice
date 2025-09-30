@@ -47,12 +47,19 @@ export default function PaymentsCard({ slug }: { slug: string }) {
 
   const toggle = (path: string) => {
     setPayments((p) => {
-      const next: any = JSON.parse(JSON.stringify(p || defaultPayments));
+      const next: ShoppingPayments = JSON.parse(JSON.stringify(p || defaultPayments)) as ShoppingPayments;
       const parts = path.split(".");
-      let cur = next;
-      for (let i = 0; i < parts.length - 1; i++) cur = (cur[parts[i]] ??= {});
-      const leaf = parts[parts.length - 1];
-      cur[leaf] = !cur[leaf];
+      let cur: Record<string, unknown> = (next as unknown as Record<string, unknown>);
+      for (let i = 0; i < parts.length - 1; i++) {
+        const k = parts[i]!;
+        const child = (cur[k] as Record<string, unknown> | undefined) ?? {};
+        cur[k] = child;
+        cur = child;
+      }
+      const leaf = parts[parts.length - 1]!;
+      const prev = cur[leaf];
+      const prevBool = typeof prev === 'boolean' ? (prev as boolean) : false;
+      cur[leaf] = !prevBool;
       return next;
     });
   };

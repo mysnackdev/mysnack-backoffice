@@ -70,6 +70,7 @@ export default function Sidebar() {
   const path = pathname ?? "";
   const isHome     = path === "/";
   const isMenus    = path.startsWith("/menus");
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
   const isPayments = path.startsWith("/payment-methods");
   const isDelivery = path.startsWith("/delivery-configuration");
   const isOpening  = path.startsWith("/opening-hours");

@@ -9,6 +9,7 @@ import StoreStatusToolbar from "@/components/StoreStatusToolbar";
 import OperatorsCard from "@/components/store/OperatorsCard";
 import { Toaster, toast } from "@/components/ui/toast";
 import { useAuth } from "@/context/AuthContext";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import {  syncSetupStatus } from "@/lib/completeness";
 import { listShoppingsCF, linkStoreToShoppingCF } from "@/services/admin.service";
 import type { Shop } from "@/services/admin.service";
@@ -151,7 +152,6 @@ export default function MinhaLojaPage() {
   }
 
   async function handleBlur<K extends keyof StoreProfile>(key: K) {
-    const rProfile = ref(db, `backoffice/tenants/${uid}/storeProfile/${String(key)}`);
     // usar SET direto no caminho (evita chaves inválidas no update)
     await set(child(ref(db, `backoffice/tenants/${uid}/storeProfile`), String(key)), form[key] as unknown);
     await syncSetupStatus(uid);

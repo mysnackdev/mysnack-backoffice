@@ -2,18 +2,19 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { db } from "../../firebase";
+import { db } from "@/firebase";
 import { get, ref } from "firebase/database";
 import StatusBadgeWithActions from "@/components/StatusBadgeWithActions";
 import { useOperatorApproval } from "@/hooks/useOperatorApproval";
 import { fetchMyStoreOrdersEnriched, type EnrichedOrder } from "@/services/orders.enriched.service";
 import { LoadingContainer } from "@/components/loading-container.component";
+import type { OrderItem, OrderLike, EnrichedOrderExtra } from "@/types/order";
 
 function fmtBRL(v?: number | null) {
   try { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v ?? 0)); } catch { return "R$ 0,00"; }
 }
-function pick<T>(...vals: T[]) { return vals.find((x) => x !== undefined && x !== null); }
-function parseNum(v: any): number | null {
+function pick<T>(...vals: T[]) { return vals.find((x) => x !== undefined && x !== null) as T | undefined; }
+function parseNum(v: unknown): number | null {
   if (v == null) return null;
   if (typeof v === "number") return v;
   if (typeof v === "string") {
@@ -23,21 +24,21 @@ function parseNum(v: any): number | null {
   }
   return null;
 }
-function fromCentsMaybe(v: any, fallback?: any) {
+function fromCentsMaybe(v: unknown, fallback?: number) {
   const n = parseNum(v);
   if (n == null) return fallback ?? null;
   return n >= 100 ? n / 100 : n;
 }
 
-function OrderItems({ order }: { order: any }) {
-  const rawAny = order?.items;
-  const raw: any[] = Array.isArray(rawAny) ? rawAny : (rawAny && typeof rawAny === "object" ? Object.values(rawAny) : []);
+function OrderItems({ order }: { order: OrderLike }) {
+  const rawAny = (order as OrderLike)?.items;
+  const raw: OrderItem[] = Array.isArray(rawAny) ? rawAny as OrderItem[] : (rawAny && typeof rawAny === "object" ? Object.values(rawAny as Record<string, OrderItem>) : []);
   const preview: string[] = Array.isArray(order?.itemsPreview) ? order.itemsPreview : [];
   const hasRaw = raw && raw.length > 0;
 
-  const stringifyOptions = (x: any): string | null => {
+  const stringifyOptions = (x: unknown): string | null => {
     const acc: string[] = [];
-    const walk = (y: any) => {
+    const walk = (y: unknown) => {
       if (!y) return;
       if (typeof y === "string" || typeof y === "number") acc.push(String(y));
       else if (Array.isArray(y)) y.forEach(walk);
@@ -48,7 +49,7 @@ function OrderItems({ order }: { order: any }) {
   };
 
   if (hasRaw) {
-    const rows = raw.map((it: any) => {
+    const rows = raw.map((it: OrderItem) => {
       const name = pick(it?.name, it?.title, it?.productName, it?.product?.name, it?.label, "Item");
       const qty = parseNum(pick(it?.quantity, it?.qty, it?.qtd, 1)) || 1;
 
@@ -69,8 +70,11 @@ function OrderItems({ order }: { order: any }) {
     const totalOrder = rows.reduce((acc, r) => acc + (r.total ?? 0), 0);
 
     const deliveryFee = pick(order?.deliveryFee, order?.frete, order?.shippingFee, order?.delivery?.fee);
+    const deliveryFeeN = parseNum(deliveryFee);
     const serviceFee  = pick(order?.serviceFee,  order?.taxa,  order?.fees?.service);
+    const serviceFeeN = parseNum(serviceFee);
     const discount    = pick(order?.discount, order?.couponDiscount, order?.cupomDesconto, order?.desconto);
+    const discountN   = parseNum(discount);
     const totalProvided = pick(order?.total, order?.amount);
     const grandTotal = (totalProvided != null)
       ? Number(totalProvided)
@@ -80,7 +84,7 @@ function OrderItems({ order }: { order: any }) {
       <>
         <ul className="mt-2 pt-1 space-y-1">
           {rows.map((r, idx) => (
-            <li key={r.key || idx} className="grid grid-cols-[40px,1fr,84px,96px] items-center gap-1 py-0.5">
+            <li key={String(r.key ?? idx)} className="grid grid-cols-[40px,1fr,84px,96px] items-center gap-1 py-0.5">
               <div className="text-right tabular-nums text-zinc-600">{r.qty}×</div>
               <div className="min-w-0">
                 <div className="truncate">{r.name}</div>
@@ -96,19 +100,19 @@ function OrderItems({ order }: { order: any }) {
           <div className="text-right text-[12px] text-zinc-600">Subtotal</div>
           <div className="text-right text-[13px] tabular-nums">{fmtBRL(totalOrder)}</div>
 
-          {serviceFee != null && (<>
+          {serviceFeeN != null && (<>
             <div className="text-right text-[12px] text-zinc-600">Taxa de serviço</div>
-            <div className="text-right text-[13px] tabular-nums">{fmtBRL(serviceFee)}</div>
+            <div className="text-right text-[13px] tabular-nums">{fmtBRL(serviceFeeN)}</div>
           </>)}
 
-          {deliveryFee != null && (<>
+          {deliveryFeeN != null && (<>
             <div className="text-right text-[12px] text-zinc-600">Entrega</div>
-            <div className="text-right text-[13px] tabular-nums">{fmtBRL(deliveryFee)}</div>
+            <div className="text-right text-[13px] tabular-nums">{fmtBRL(deliveryFeeN)}</div>
           </>)}
 
-          {discount != null && Number(discount) !== 0 && (<>
+          {discountN != null && Number(discountN) !== 0 && (<>
             <div className="text-right text-[12px] text-zinc-600">Desconto</div>
-            <div className="text-right text-[13px] tabular-nums">- {fmtBRL(Math.abs(Number(discount)))}</div>
+            <div className="text-right text-[13px] tabular-nums">- {fmtBRL(Math.abs(Number(discountN)))}</div>
           </>)}
 
           <div className="text-right text-[13px] font-semibold">Total do pedido</div>
@@ -136,7 +140,7 @@ function OrderCard({ o }: { o: EnrichedOrder }) {
   const created = o.createdAt ? new Date(o.createdAt).toLocaleString("pt-BR") : "";
   const number = o.number || ("#" + (o.id?.slice?.(-4) ?? ""));
   const user = o.userName || o.userEmail || "Cliente";
-  const subtitle = [o.userEmail, (o as any).userPhone].filter(Boolean).join(" · ");
+  const subtitle = [o.userEmail, (o as EnrichedOrderExtra).userPhone].filter(Boolean).join(" · ");
 
   return (
     <li className="rounded-xl border bg-white p-3 shadow-sm">
@@ -163,13 +167,13 @@ function OrderCard({ o }: { o: EnrichedOrder }) {
       
       {/* Observações (opcional) */}
       {(() => {
-        const note = (o as any).notes ?? (o as any).observations ?? (o as any).obs ?? null;
+        const note = (o as EnrichedOrderExtra).notes ?? (o as EnrichedOrderExtra).observations ?? (o as EnrichedOrderExtra).obs ?? null;
         if (!note) return null;
         return <div className="mt-2 text-[12px] text-zinc-700 bg-zinc-50 rounded px-2 py-1 whitespace-pre-wrap">{String(note)}</div>;
       })()}
     
       {(() => {
-        const note = (o as any).notes ?? (o as any).observations ?? (o as any).obs ?? null;
+        const note = (o as EnrichedOrderExtra).notes ?? (o as EnrichedOrderExtra).observations ?? (o as EnrichedOrderExtra).obs ?? null;
         if (!note) return null;
         return <div className="mt-2 text-[12px] text-zinc-700 bg-zinc-50 rounded px-2 py-1 whitespace-pre-wrap">{String(note)}</div>;
       })()}
@@ -196,7 +200,7 @@ export default function OrdersGrid() {
         const hydrated = await Promise.all(list.map(async (o) => {
           try {
             const snap = await get(ref(db, `orders/${o.id}`));
-            const val: any = snap.val() || null;
+            const val = (snap.val() ?? null) as unknown;
             if (val) return { ...o, ...val };
           } catch {}
           return o;

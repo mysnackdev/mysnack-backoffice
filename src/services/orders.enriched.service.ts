@@ -37,12 +37,16 @@ export async function fetchMyStoreOrdersEnriched(storeId?: string, limit = 50): 
     // Prefer the stable function name exported by cloud functions
     const call = httpsCallable<ListReq, ListRes>(functions, "listStoreOrdersEnriched");
     const res = await call({ storeId, limit });
-    const data: ListRes = (res?.data as any) || {};
-    const orders = Array.isArray((data as any).orders) ? (data as any).orders as EnrichedOrder[] : [];
+    const data: ListRes = isListRes(res?.data) ? (res!.data as ListRes) : {};
+    const orders = Array.isArray((data as ListRes).orders) ? (data as ListRes).orders as EnrichedOrder[] : [];
     return orders;
   } catch (e) {
     console.error("[fetchMyStoreOrdersEnriched] callable error", e);
     // Fail closed with empty list to avoid overlay
     return [];
   }
+}
+
+function isListRes(x: unknown): x is ListRes {
+  return typeof x === "object" && x !== null;
 }

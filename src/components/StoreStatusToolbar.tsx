@@ -17,6 +17,7 @@ import { toast } from "@/components/ui/toast";
 
 type Setup = "configurado" | "em_configuracao";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type StoreDoc = { status?: { online?: boolean; cadastroCompleto?: boolean; _setup?: Setup; onlineReason?: string | null }; shoppingSlug?: string | null; approved?: boolean; suspended?: boolean };
 
 function Dot({ on }: { on: boolean }) {
@@ -46,6 +47,7 @@ export default function StoreStatusToolbar() {
 
   const [online, setOnline] = useState(false);
   const [cadastroCompleto, setCadastroCompleto] = useState(false);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_setup, setSetup] = useState<Setup>("em_configuracao");
   const [shoppingSlug, setShoppingSlug] = useState<string | null>(null);
   const [suspended, setSuspended] = useState<boolean>(false);
@@ -59,7 +61,7 @@ export default function StoreStatusToolbar() {
       const st = base.status || {};
       setOnline(Boolean(st.online));
       setCadastroCompleto(Boolean(st.cadastroCompleto));
-      setSetup((st.setup as Setup) || "em_configuracao");
+      setSetup((st._setup as Setup) || "em_configuracao");
       setShoppingSlug(base.shoppingSlug || null);
       
       setSuspended(Boolean(base.suspended));

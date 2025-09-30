@@ -53,7 +53,7 @@ export default function LandingPortal() {
       <div className="grid md:grid-cols-2 gap-8 max-w-5xl w-full">
         <div className="rounded-3xl bg-white/60 backdrop-blur border border-rose-100 p-10">
           <div className="w-20 h-20 mx-auto mb-6 overflow-hidden rounded-full shadow">
-            <Image src="/logo.svg" alt="mysnack" width={80} height={80} />
+            <Image src="/../logo.svg" alt="mysnack" width={80} height={80} />
           </div>
           <h1 className="text-2xl font-semibold text-center mb-2">Portal do Parceiro</h1>
           <p className="text-center text-zinc-600">Gerencie sua loja de forma fácil e rápida</p>

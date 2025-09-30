@@ -1,13 +1,14 @@
 {
   "name": "mysnack-backoffice",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && next export",
     "start": "next start",
     "lint": "next lint",
-    "deploy": "firebase deploy --only hosting:mysnack-backoffice-6fb29"
+    "deploy": "firebase deploy --only hosting:mysnack-backoffice-6fb29",
+    "predeploy": "npm run build"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^6.7.2",

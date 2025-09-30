@@ -1,146 +1,125 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getAuth } from "firebase/auth";
-import { getDatabase, ref, onValue } from "firebase/database";
+import { ref, onValue, get } from "firebase/database";
+import { auth, db } from "@/services/firebase";
+
 export type ApprovalState = {
   loading: boolean;
   approved: boolean;
   storeId: string | null;
 };
 
-/**
- * Observa aprovação do operador em tempo real.
- * Regras de combinação (para evitar estados divergentes):
- *  - Se QUALQUER fonte disser explicitamente FALSE -> approved = false
- *  - Caso contrário, se QUALQUER fonte disser TRUE -> approved = true
- *  - Caso nenhuma fonte exista -> false
- * Fontes monitoradas:
- *  A) /backoffice/operators/{uid}  (approved, storeId)
- *  B) /backoffice/users/{uid}/storeId  -> /backoffice/tenants/{storeId}/operators/{uid}/approved
- */
+type OperatorIndex = { storeId?: string | null; approved?: boolean | string | number; owner?: boolean };
+
 export function useOperatorApproval(): ApprovalState {
-  const [state, setState] = useState<ApprovalState>({
-    loading: true,
-    approved: false,
-    storeId: null,
-  });
+  const [state, setState] = useState<ApprovalState>({ loading: true, approved: false, storeId: null });
 
-  const opApprovedRef = useRef<boolean | null>(null);
   const opStoreIdRef = useRef<string | null>(null);
-
-  const tenApprovedRef = useRef<boolean | null>(null);
   const userStoreIdRef = useRef<string | null>(null);
+  const opApprovedRef = useRef<boolean | null>(null);
+  const tenApprovedRef = useRef<boolean | null>(null);
 
-  const publish = () => {
-    const storeId = opStoreIdRef.current ?? userStoreIdRef.current ?? null;
-    const vals: Array<boolean | null> = [opApprovedRef.current, tenApprovedRef.current];
-    // Dominância do FALSE explícito
-    const anyFalse = vals.some(v => v === false);
-    const anyTrue  = vals.some(v => v === true);
-    const approved = anyFalse ? false : (anyTrue ? true : false);
-
-    setState(prev => {
-      const next = { loading: false, approved, storeId };
-      if (prev.loading !== next.loading || prev.approved !== next.approved || prev.storeId !== next.storeId) {
-        return next;
-      }
-      return prev;
-    });
+  const computeStoreId = () => opStoreIdRef.current || userStoreIdRef.current || null;
+  const computeApproved = () => {
+    const votes: Array<boolean | null> = [opApprovedRef.current, tenApprovedRef.current];
+    if (votes.some(v => v === false)) return false;
+    if (votes.some(v => v === true)) return true;
+    return false;
   };
+  const publish = () => setState({ loading: false, approved: computeApproved(), storeId: computeStoreId() });
 
   useEffect(() => {
-    const auth = getAuth();
-    const db = getDatabase();
     let unsubs: Array<() => void> = [];
+    let offAuth: (() => void) | null = null;
 
     const stop = () => {
-      unsubs.forEach(fn => { try { fn(); } catch {} });
+      unsubs.forEach(fn => { try { fn(); } catch (_e) {} });
       unsubs = [];
     };
 
-    const offAuth = auth.onAuthStateChanged(user => {
+    async function fallbackDiscoverStoreId(uid: string) {
+      try {
+        const snap = await get(ref(db, "backoffice/tenants"));
+        if (!snap.exists()) return;
+        const tenants = snap.val() as unknown as Record<string, { operators?: Record<string, OperatorIndex> }>;
+        for (const sid of Object.keys(tenants)) {
+          const op = tenants[sid]?.operators?.[uid];
+          if (op) {
+            userStoreIdRef.current = String(sid);
+            tenApprovedRef.current =
+              op.owner === true ? true :
+              (op.approved === true || op.approved === "true" || op.approved === 1) ? true :
+              (op.approved === false || op.approved === "false" || op.approved === 0) ? false :
+              null;
+            publish();
+            break;
+          }
+        }
+      } catch (_e) {}
+    }
+
+    offAuth = auth.onIdTokenChanged(user => {
       stop();
-      opApprovedRef.current = null;
       opStoreIdRef.current = null;
-      tenApprovedRef.current = null;
       userStoreIdRef.current = null;
+      opApprovedRef.current = null;
+      tenApprovedRef.current = null;
 
       if (!user) {
         setState({ loading: false, approved: false, storeId: null });
         return;
       }
+      setState(prev => ({ ...prev, loading: true }));
 
       // A) /backoffice/operators/{uid}
-      {
-        const r = ref(db, `backoffice/operators/${user.uid}`);
-        const off = onValue(
-          r,
-          snap => {
-            const v = (snap.val() as { approved?: boolean | string | number; storeId?: string | number } ) || {};
-            // importante: FALSE explícito deve aparecer como false, não null
-            opApprovedRef.current = (v?.approved === true || v?.approved === "true" || v?.approved === 1)
-              ? true
-              : (v?.approved === false || v?.approved === "false" || v?.approved === 0)
-              ? false
-              : null;
-            opStoreIdRef.current = v?.storeId ? String(v.storeId) : null;
-            publish();
-          },
-          () => {
-            opApprovedRef.current = null;
-            publish();
-          }
-        );
-        unsubs.push(off);
-      }
+      const aRef = ref(db, `backoffice/operators/${user.uid}`);
+      const offA = onValue(aRef, (ss) => {
+        const v = ss.val() as unknown as OperatorIndex | null;
+        opStoreIdRef.current = (v?.storeId ?? null) ? String(v?.storeId) : null;
+        opApprovedRef.current =
+          v?.owner === true ? true :
+          (v?.approved === true || v?.approved === "true" || v?.approved === 1) ? true :
+          (v?.approved === false || v?.approved === "false" || v?.approved === 0) ? false :
+          null;
+        publish();
+      });
+      unsubs.push(offA as unknown as () => void);
 
-      // B) /backoffice/users/{uid}/storeId -> /backoffice/tenants/{sid}/operators/{uid}/approved
-      {
-        let offTenant: null | (() => void) = null;
-        const rStore = ref(db, `backoffice/users/${user.uid}/storeId`);
-        const off = onValue(
-          rStore,
-          s => {
-            userStoreIdRef.current = s.exists() ? String(s.val()) : null;
-            // rewire tenant subscription
-            if (offTenant) { try { offTenant(); } catch {} ; offTenant = null; }
-            const sid = userStoreIdRef.current;
-            if (sid) {
-              const r = ref(db, `backoffice/tenants/${sid}/operators/${user.uid}/approved`);
-              offTenant = onValue(
-                r,
-                ap => {
-                  const v = ap.val();
-                  tenApprovedRef.current = (v === true || v === "true" || v === 1)
-                    ? true
-                    : (v === false || v === "false" || v === 0)
-                    ? false
-                    : null;
-                  publish();
-                },
-                () => {
-                  tenApprovedRef.current = null;
-                  publish();
-                }
-              );
-              unsubs.push(() => { if (offTenant) offTenant(); });
-            } else {
-              tenApprovedRef.current = null;
-              publish();
-            }
-          },
-          () => {
-            userStoreIdRef.current = null;
+      // B) /backoffice/users/{uid}/storeId -> valida em tenants
+      const bRef = ref(db, `backoffice/users/${user.uid}/storeId`);
+      const offB = onValue(bRef, (ss) => {
+        const sid = ss.exists() ? String(ss.val()) : null;
+        userStoreIdRef.current = sid;
+        if (sid) {
+          const tRef = ref(db, `backoffice/tenants/${sid}/operators/${user.uid}`);
+          const offT = onValue(tRef, (ts) => {
+            const op = ts.val() as unknown as OperatorIndex | null;
+            tenApprovedRef.current =
+              op?.owner === true ? true :
+              (op?.approved === true || op?.approved === "true" || op?.approved === 1) ? true :
+              (op?.approved === false || op?.approved === "false" || op?.approved === 0) ? false :
+              null;
             publish();
-          }
-        );
-        unsubs.push(off);
-      }
+          });
+          unsubs.push(offT as unknown as () => void);
+        } else {
+          tenApprovedRef.current = null;
+          publish();
+        }
+      });
+      unsubs.push(offB as unknown as () => void);
+
+      // Fallback em 300ms
+      setTimeout(() => {
+        if (!opStoreIdRef.current && !userStoreIdRef.current && auth.currentUser) {
+          void fallbackDiscoverStoreId(auth.currentUser.uid);
+        }
+      }, 300);
     });
 
     return () => {
-      offAuth();
+      if (offAuth) offAuth();
       stop();
     };
   }, []);

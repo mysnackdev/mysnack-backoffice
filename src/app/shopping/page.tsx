@@ -1,4 +1,7 @@
 "use client";
+
+type RatingLike = { avg?: number; votes?: number; count?: number; total?: number; n?: number };
+
 // src/app/shopping/page.tsx
 import type { Shop } from "@/services/admin.service";
 
@@ -164,9 +167,9 @@ export default function ShoppingPage() {
               onClick={async () => {
                 try {
                   const r = await submitShoppingLikertCF({ slug, value: n });
-                  setAvg((r as any).avg);
+                  setAvg((r as RatingLike).avg);
                   const __votes =
-                    (r as any).votes ?? (r as any).count ?? (r as any).total ?? (r as any).n ?? 0;
+                    ((r as RatingLike).votes ?? (r as RatingLike).count ?? (r as RatingLike).total ?? (r as RatingLike).n ?? 0);
                   setVotes(__votes);
                 } catch (e: unknown) {
                   const __msg = e instanceof Error ? e.message : String(e);
@@ -297,7 +300,7 @@ export default function ShoppingPage() {
                           : "Desativado manualmente no painel.",
                       });
                       applyStoreStatusLocal(s.id, r.approved, r.suspended);
-                      toast.message(r.suspended ? "Loja colocada offline." : "Loja reativada.");
+                      toast.info(r.suspended ? "Loja colocada offline." : "Loja reativada.");
                     } catch (e: unknown) {
                       const __msg = e instanceof Error ? e.message : String(e);
                       toast.error(__msg);

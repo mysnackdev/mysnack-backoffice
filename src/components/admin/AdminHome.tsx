@@ -9,6 +9,7 @@ import {
   createShoppingCF,
   
   setTenantOnlineCF,
+  suspendStoreInShoppingCF,
   type StoreSummary,
   type Shop
 } from "@/services/admin.service";
@@ -225,7 +226,7 @@ export default function AdminHome() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={async () => {
-                      await setTenantOnlineCF({ shoppingSlug: selectedShop as string, storeId: s.id });
+                      await setTenantOnlineCF({ storeId: s.id, online: true });
                     }}
                     className="border rounded-lg px-3 py-1"
                   >
@@ -233,7 +234,7 @@ export default function AdminHome() {
                   </button>
                   <button
                     onClick={async () => {
-                      await setTenantOnlineCF({ shoppingSlug: selectedShop as string, storeId: s.id, suspended: true });
+                      await suspendStoreInShoppingCF({ shoppingSlug: selectedShop as string, storeId: s.id, suspended: true });
                     }}
                     className="border rounded-lg px-3 py-1 text-red-600"
                   >
@@ -241,7 +242,7 @@ export default function AdminHome() {
                   </button>
                   <button
                     onClick={async () => {
-                      await setTenantOnlineCF({ shoppingSlug: selectedShop as string, storeId: s.id, suspended: false });
+                      await suspendStoreInShoppingCF({ shoppingSlug: selectedShop as string, storeId: s.id, suspended: false });
                     }}
                     className="border rounded-lg px-3 py-1"
                   >
