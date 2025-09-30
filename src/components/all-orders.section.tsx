@@ -10,6 +10,19 @@ import { get, ref, onValue, onChildAdded, onChildChanged, onChildRemoved } from 
 import type { OrderItem, OrderLike, EnrichedOrderExtra } from "@/types/order";
 
 type OrderRow = EnrichedOrder & Partial<OrderLike> & EnrichedOrderExtra;
+// --- Inatividade por status (15 min)
+const STALE_MINUTES = 15;
+const TERMINAL_STATUSES = new Set<string>([
+  "pedido entregue",
+  "entregue",
+  "pedido cancelado",
+  "cancelado",
+]);
+function isTerminalStatus(status: unknown): boolean {
+  const s = String(status ?? "").toLowerCase().trim();
+  return TERMINAL_STATUSES.has(s);
+}
+
 
 function normalizeItems(items: OrderLike["items"]): OrderItem[] {
   if (!items) return [];
@@ -35,7 +48,7 @@ function fmt(x: unknown): string {
   try { return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); } catch { return `R$ ${n.toFixed(2)}`; }
 }
 
-function OrderCard({ o }: { o: OrderRow }) {
+function OrderCard({ o, nowMs }: { o: OrderRow; nowMs: number }) {
   // Client info (from enriched or full order)
   const cs = (o as unknown as { clientSummary?: { displayName?: string; email?: string; phone?: string } }).clientSummary;
   const displayName = o.userName ?? cs?.displayName ?? "";
@@ -65,7 +78,17 @@ const total = typeof amounts.total === "number" ? amounts.total
   ?? (o as unknown as { grandTotal?: number | string }).grandTotal
   ?? subtotal;
 
-  return (
+  // Inatividade: 15+ min no mesmo status (exceto entregues/cancelados)
+  const terminal = isTerminalStatus(o.status);
+  const refTsUnknown = (o as unknown as { statusChangedAt?: number }).statusChangedAt
+    ?? (o as unknown as { updatedAt?: number }).updatedAt
+    ?? (o as unknown as { createdAt?: number }).createdAt
+    ?? 0;
+  const refTs = typeof refTsUnknown === "number" ? refTsUnknown : Number(refTsUnknown ?? 0);
+  const sinceMs = Number.isFinite(refTs) && refTs > 0 ? (nowMs - refTs) : Number.POSITIVE_INFINITY;
+  const stale = !terminal && sinceMs >= STALE_MINUTES * 60_000;
+  const staleMinutes = Math.floor(sinceMs / 60_000);
+return (
     <li className="rounded-lg border p-3 bg-white">
       <div className="flex items-center justify-between">
         <div className="font-medium">#{o.id}</div>
@@ -73,7 +96,17 @@ const total = typeof amounts.total === "number" ? amounts.total
       </div>
 
       {/* Client summary */}
-      {(displayName || email || phone) && (
+      {stale && (
+        <div className="mb-1">
+          <span
+            className="inline-flex items-center px-2 py-[2px] rounded-full border border-amber-300 bg-amber-50 text-amber-800 text-[10px] font-semibold tracking-wide uppercase"
+            title="Pedido está há 15+ min sem mudança de status"
+          >
+            ⚠︎ sem mudança há {staleMinutes} min
+          </span>
+        </div>
+      )}
+{(displayName || email || phone) && (
         <div className="text-xs text-muted-foreground mt-1">
           <span className="font-medium">Cliente</span> {displayName || ""}{email ? ` · ${email}` : ""}{phone ? ` · ${phone}` : ""}
         </div>
@@ -107,7 +140,13 @@ export default function AllOrdersSection() {
   const [loading, setLoading] = useState<boolean>(approvalLoading);
 
   
-    useEffect(() => {
+    const [nowMs, setNowMs] = useState<number>(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+useEffect(() => {
   if (!storeId) {
     setItems([]);
     setLoading(false);
@@ -257,7 +296,7 @@ export default function AllOrdersSection() {
         ) : (
           <ul className="space-y-3">
             {items.map((o) => (
-              <OrderCard key={o.id} o={o} />
+              <OrderCard key={o.id} o={o} nowMs={nowMs} />
             ))}
           </ul>
         )}
